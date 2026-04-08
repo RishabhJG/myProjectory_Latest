@@ -1,0 +1,29 @@
+import { AppLayout } from "@/components/layout/AppLayout";
+import { Switch, Route } from "wouter";
+import Dashboard from "@/pages/dashboard";
+import Portfolio from "@/pages/portfolio/index";
+import PortfolioDetail from "@/pages/portfolio/[id]";
+import Scores from "@/pages/scores";
+import Roadmaps from "@/pages/roadmaps/index";
+import RoadmapDetail from "@/pages/roadmaps/[id]";
+import Jobs from "@/pages/jobs";
+import Profile from "@/pages/profile";
+import NotFound from "@/pages/not-found";
+
+export function AppRoutes() {
+  return (
+    <AppLayout>
+      <Switch>
+        <Route path="/dashboard" component={Dashboard} />
+        <Route path="/portfolio" component={Portfolio} />
+        <Route path="/portfolio/:id" component={PortfolioDetail} />
+        <Route path="/scores" component={Scores} />
+        <Route path="/roadmaps" component={Roadmaps} />
+        <Route path="/roadmaps/:id" component={RoadmapDetail} />
+        <Route path="/jobs" component={Jobs} />
+        <Route path="/profile" component={Profile} />
+        <Route component={NotFound} />
+      </Switch>
+    </AppLayout>
+  );
+}

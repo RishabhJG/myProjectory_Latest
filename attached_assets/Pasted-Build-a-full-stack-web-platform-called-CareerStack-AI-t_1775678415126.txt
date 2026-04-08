@@ -1,0 +1,393 @@
+Build a full-stack web platform called **CareerStack AI** that helps fresh graduates continuously build, track, and showcase their practical project portfolios and measure job-readiness based on current market demand.
+
+This is a production-grade MVP, so build it as a scalable web application with clean architecture.
+
+==================================================
+CORE PROBLEM TO SOLVE
+==================================================
+
+Fresh graduates currently lack a structured and credible way to continuously build, track, and showcase practical work aligned with real job market demands.
+
+Their work is fragmented across multiple platforms, lacks standardization, and is not mapped to relevant job roles or skills.
+
+This platform should bridge the gap between:
+- learning
+- skill validation
+- portfolio building
+- job readiness
+- employment opportunities
+
+==================================================
+TECH STACK TO USE
+==================================================
+
+Frontend:
+- Next.js 14
+- Tailwind CSS
+- ShadCN UI
+- Framer Motion
+- Recharts for dashboards
+
+Backend:
+- Node.js
+- Express / Next API routes
+
+Database:
+- PostgreSQL (preferred)
+- Prisma ORM
+
+Authentication:
+- Clerk / NextAuth / JWT
+
+Scraping / AI:
+- Python microservice for job scraping
+- BeautifulSoup / Playwright
+- FastAPI for scraper service
+
+Deployment:
+- Must be Replit deployable
+
+==================================================
+PLATFORM MODULES
+==================================================
+
+Build the platform with the following modules:
+
+--------------------------------------------------
+1. STUDENT AUTH + PROFILE
+--------------------------------------------------
+
+Student signup/login
+
+Fields:
+- name
+- email
+- college
+- degree
+- graduation year
+- career goal
+- preferred domain
+- interests
+- skills
+
+Profile dashboard must support:
+- edit profile
+- upload profile photo
+- update career goals
+
+--------------------------------------------------
+2. PORTFOLIO BUILDER
+--------------------------------------------------
+
+Create a structured portfolio submission form.
+
+Students should be able to add multiple projects.
+
+Each project must contain:
+
+- project title
+- description
+- problem solved
+- technologies used
+- difficulty level
+- github link
+- live deployment link
+- screenshots
+- duration
+- role in project
+- project category
+- completion status
+
+Support multiple project submissions.
+
+Store projects in normalized DB tables.
+
+--------------------------------------------------
+3. TECH STACK COMFORT SCORE ENGINE
+--------------------------------------------------
+
+Create a scoring engine that analyzes all projects submitted.
+
+The platform should calculate:
+
+- most frequently used tech stack
+- confidence score per technology
+- comfort score per technology
+- practical experience score
+
+Example:
+
+Python used in 5 projects = high confidence
+
+React used in 1 project = medium confidence
+
+Formula example:
+
+comfort_score = 
+(number_of_projects_using_tech × project_complexity × completion_score)
+
+Normalize score out of 100.
+
+Show as:
+
+- Python → 88
+- React → 72
+- SQL → 64
+
+Display visually using progress bars and radar chart.
+
+--------------------------------------------------
+4. MARKET DEMAND ENGINE
+--------------------------------------------------
+
+Build a demand engine that maps current job market demand.
+
+For every tech stack, fetch:
+- total open jobs
+- trend score
+- growth demand
+- required skills
+
+Example:
+
+Python demand → 92
+React demand → 85
+Java demand → 74
+
+Use scraped jobs data for this.
+
+--------------------------------------------------
+5. JOB READINESS SCORE
+--------------------------------------------------
+
+Generate a dynamic job-readiness score.
+
+Formula should combine:
+
+- comfort score
+- roadmap completion
+- market demand score
+- portfolio strength
+- skill gap analysis
+
+Example formula:
+
+job_readiness_score =
+(comfort_score * 0.35) +
+(market_demand * 0.25) +
+(roadmap_completion * 0.25) +
+(portfolio_quality * 0.15)
+
+Final score out of 100.
+
+Display:
+- score card
+- readiness status
+- suggestions
+
+Example:
+
+78 → Interview Ready
+54 → Needs Improvement
+
+--------------------------------------------------
+6. INDUSTRY ROADMAP GENERATOR
+--------------------------------------------------
+
+For each tech stack generate milestone-based roadmaps.
+
+Example for Python:
+
+Milestone 1:
+- Basics
+- OOP
+- File handling
+
+Milestone 2:
+- NumPy
+- Pandas
+- Data cleaning
+
+Milestone 3:
+- APIs
+- Flask / FastAPI
+- Deployment
+
+Milestone 4:
+- Industry project
+- Testing
+- Docker
+
+Each milestone should have:
+- tasks
+- estimated duration
+- industry relevance
+
+Milestones should be generated dynamically using market demand data.
+
+--------------------------------------------------
+7. TASK TRACKER + PROGRESS UI
+--------------------------------------------------
+
+Roadmap milestones must be displayed as boxes/cards.
+
+Color logic:
+- grey = incomplete
+- green = completed
+- yellow = in progress
+
+Student can:
+- mark task complete
+- mark milestone complete
+
+When completed:
+- update portfolio automatically
+- update readiness score automatically
+- update skill confidence score
+
+Progress bar should update in real time.
+
+--------------------------------------------------
+8. JOB SCRAPER SYSTEM
+--------------------------------------------------
+
+Build a separate Python scraping service.
+
+This scraper must fetch live jobs from:
+- LinkedIn
+- Indeed
+- Naukri
+- Internshala
+- Wellfound / AngelList
+
+Input:
+tech stack
+
+Example:
+Python jobs
+
+Scrape:
+- job title
+- company
+- location
+- experience
+- required skills
+- salary (if available)
+- apply link
+
+Store in jobs table.
+
+Add scheduled scraping:
+- daily refresh
+
+Create FastAPI endpoints:
+
+/jobs/python
+/jobs/react
+
+--------------------------------------------------
+9. JOB MATCHING ENGINE
+--------------------------------------------------
+
+Match students with jobs based on:
+- readiness score
+- skills
+- roadmap progress
+- tech comfort score
+
+Show:
+- best matched jobs
+- missing skills
+- probability of selection
+
+Example:
+Match Score: 84%
+
+--------------------------------------------------
+10. DASHBOARD
+--------------------------------------------------
+
+Create a beautiful student dashboard with:
+
+- total projects
+- strongest tech stack
+- readiness score
+- roadmap progress
+- job matches
+- recent jobs
+- skill gap suggestions
+
+Must look premium and startup-ready.
+
+==================================================
+DATABASE SCHEMA
+==================================================
+
+Design proper schema for:
+
+users
+projects
+project_technologies
+technology_scores
+roadmaps
+milestones
+tasks
+task_progress
+jobs
+job_matches
+readiness_scores
+
+Use Prisma schema.
+
+==================================================
+IMPORTANT LOGIC
+==================================================
+
+Everything must update dynamically.
+
+Whenever:
+- project added
+- task completed
+- milestone completed
+
+Automatically recalculate:
+- comfort score
+- roadmap score
+- job readiness score
+- job matching score
+
+==================================================
+DESIGN REQUIREMENT
+==================================================
+
+Use modern SaaS design.
+
+Style inspiration:
+- Notion
+- Linear
+- Framer
+- Stripe dashboard
+
+Use:
+- glassmorphism cards
+- soft shadows
+- rounded 2xl cards
+- clean spacing
+- responsive design
+
+==================================================
+DELIVERABLES
+==================================================
+
+Generate:
+
+1. Full project structure
+2. All frontend pages
+3. Backend APIs
+4. Database schema
+5. scraper service
+6. scoring logic
+7. sample seed data
+8. deployment-ready code
+
+Start by building the complete project architecture first.

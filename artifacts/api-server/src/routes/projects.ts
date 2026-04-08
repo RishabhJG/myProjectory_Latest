@@ -1,0 +1,142 @@
+import { Router, type IRouter } from "express";
+import { eq, and } from "drizzle-orm";
+import { db, usersTable, projectsTable, activityTable } from "@workspace/db";
+import {
+  CreateProjectBody,
+  UpdateProjectBody,
+  GetProjectParams,
+  GetProjectResponse,
+  UpdateProjectParams,
+  UpdateProjectResponse,
+  DeleteProjectParams,
+  ListProjectsResponse,
+} from "@workspace/api-zod";
+import { requireAuth } from "../middlewares/requireAuth";
+
+const router: IRouter = Router();
+
+async function getUserId(clerkId: string): Promise<number | null> {
+  const [user] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.clerkId, clerkId));
+  return user?.id ?? null;
+}
+
+router.get("/projects", requireAuth, async (req, res): Promise<void> => {
+  const userId = await getUserId((req as any).clerkUserId);
+  if (!userId) {
+    res.json([]);
+    return;
+  }
+  const projects = await db.select().from(projectsTable).where(eq(projectsTable.userId, userId));
+  res.json(ListProjectsResponse.parse(projects));
+});
+
+router.post("/projects", requireAuth, async (req, res): Promise<void> => {
+  const userId = await getUserId((req as any).clerkUserId);
+  if (!userId) {
+    res.status(400).json({ error: "Create a profile first" });
+    return;
+  }
+  const parsed = CreateProjectBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const [project] = await db.insert(projectsTable).values({
+    ...parsed.data,
+    userId,
+  }).returning();
+
+  await db.insert(activityTable).values({
+    userId,
+    type: "project_added",
+    title: `Added project: ${project.title}`,
+    description: `New ${parsed.data.difficultyLevel} project with ${parsed.data.technologies.join(", ")}`,
+  });
+
+  res.status(201).json(GetProjectResponse.parse(project));
+});
+
+router.get("/projects/:id", requireAuth, async (req, res): Promise<void> => {
+  const params = GetProjectParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const userId = await getUserId((req as any).clerkUserId);
+  if (!userId) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  const [project] = await db.select().from(projectsTable)
+    .where(and(eq(projectsTable.id, params.data.id), eq(projectsTable.userId, userId)));
+
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+  res.json(GetProjectResponse.parse(project));
+});
+
+router.patch("/projects/:id", requireAuth, async (req, res): Promise<void> => {
+  const params = UpdateProjectParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const parsed = UpdateProjectBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const userId = await getUserId((req as any).clerkUserId);
+  if (!userId) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  const [project] = await db.update(projectsTable)
+    .set(parsed.data)
+    .where(and(eq(projectsTable.id, params.data.id), eq(projectsTable.userId, userId)))
+    .returning();
+
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  await db.insert(activityTable).values({
+    userId,
+    type: "project_updated",
+    title: `Updated project: ${project.title}`,
+    description: `Project updated`,
+  });
+
+  res.json(UpdateProjectResponse.parse(project));
+});
+
+router.delete("/projects/:id", requireAuth, async (req, res): Promise<void> => {
+  const params = DeleteProjectParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const userId = await getUserId((req as any).clerkUserId);
+  if (!userId) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+
+  const [project] = await db.delete(projectsTable)
+    .where(and(eq(projectsTable.id, params.data.id), eq(projectsTable.userId, userId)))
+    .returning();
+
+  if (!project) {
+    res.status(404).json({ error: "Project not found" });
+    return;
+  }
+  res.sendStatus(204);
+});
+
+export default router;

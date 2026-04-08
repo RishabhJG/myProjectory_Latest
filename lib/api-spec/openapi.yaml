@@ -1,15 +1,27 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: CareerStack AI API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: profile
+    description: User profile operations
+  - name: projects
+    description: Portfolio project operations
+  - name: scores
+    description: Scoring and readiness operations
+  - name: roadmaps
+    description: Roadmap and milestone operations
+  - name: jobs
+    description: Job listing and matching operations
+  - name: dashboard
+    description: Dashboard summary operations
+
 paths:
   /healthz:
     get:
@@ -24,6 +36,350 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /profile:
+    get:
+      operationId: getProfile
+      tags: [profile]
+      summary: Get current user profile
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "404":
+          description: Profile not found
+    post:
+      operationId: createProfile
+      tags: [profile]
+      summary: Create user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProfileBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+    patch:
+      operationId: updateProfile
+      tags: [profile]
+      summary: Update user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: List all projects for current user
+      responses:
+        "200":
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+    post:
+      operationId: createProject
+      tags: [projects]
+      summary: Create a new project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+
+  /projects/{id}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      summary: Get a project by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Project details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateProject
+      tags: [projects]
+      summary: Update a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProjectBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+    delete:
+      operationId: deleteProject
+      tags: [projects]
+      summary: Delete a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /scores/tech-comfort:
+    get:
+      operationId: getTechComfortScores
+      tags: [scores]
+      summary: Get tech stack comfort scores
+      responses:
+        "200":
+          description: Technology comfort scores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TechComfortScore"
+
+  /scores/market-demand:
+    get:
+      operationId: getMarketDemandScores
+      tags: [scores]
+      summary: Get market demand scores for technologies
+      responses:
+        "200":
+          description: Market demand scores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MarketDemandScore"
+
+  /scores/job-readiness:
+    get:
+      operationId: getJobReadinessScore
+      tags: [scores]
+      summary: Get job readiness score
+      responses:
+        "200":
+          description: Job readiness score
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobReadinessScore"
+
+  /roadmaps:
+    get:
+      operationId: listRoadmaps
+      tags: [roadmaps]
+      summary: List all roadmaps for user
+      responses:
+        "200":
+          description: Roadmaps
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Roadmap"
+    post:
+      operationId: generateRoadmap
+      tags: [roadmaps]
+      summary: Generate a roadmap for a technology
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateRoadmapBody"
+      responses:
+        "201":
+          description: Roadmap generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Roadmap"
+
+  /roadmaps/{id}:
+    get:
+      operationId: getRoadmap
+      tags: [roadmaps]
+      summary: Get roadmap details with milestones
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Roadmap with milestones
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoadmapDetail"
+        "404":
+          description: Not found
+
+  /roadmaps/{roadmapId}/tasks/{taskId}/toggle:
+    patch:
+      operationId: toggleTask
+      tags: [roadmaps]
+      summary: Toggle task completion status
+      parameters:
+        - name: roadmapId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Task updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+
+  /jobs:
+    get:
+      operationId: listJobs
+      tags: [jobs]
+      summary: List jobs with optional tech filter
+      parameters:
+        - name: tech
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Job listings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Job"
+
+  /jobs/matches:
+    get:
+      operationId: getJobMatches
+      tags: [jobs]
+      summary: Get matched jobs for current user
+      responses:
+        "200":
+          description: Matched jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/JobMatch"
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard summary stats
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/skill-gaps:
+    get:
+      operationId: getSkillGaps
+      tags: [dashboard]
+      summary: Get skill gap analysis
+      responses:
+        "200":
+          description: Skill gaps
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SkillGap"
+
+  /dashboard/recent-activity:
+    get:
+      operationId: getRecentActivity
+      tags: [dashboard]
+      summary: Get recent user activity
+      responses:
+        "200":
+          description: Recent activity
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +390,527 @@ components:
       required:
         - status
 
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        clerkId:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        college:
+          type: ["string", "null"]
+        degree:
+          type: ["string", "null"]
+        graduationYear:
+          type: ["integer", "null"]
+        careerGoal:
+          type: ["string", "null"]
+        preferredDomain:
+          type: ["string", "null"]
+        interests:
+          type: array
+          items:
+            type: string
+        skills:
+          type: array
+          items:
+            type: string
+        profilePhotoUrl:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - clerkId
+        - name
+        - email
+        - interests
+        - skills
+        - createdAt
+        - updatedAt
+
+    CreateProfileBody:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        college:
+          type: string
+        degree:
+          type: string
+        graduationYear:
+          type: integer
+        careerGoal:
+          type: string
+        preferredDomain:
+          type: string
+        interests:
+          type: array
+          items:
+            type: string
+        skills:
+          type: array
+          items:
+            type: string
+      required:
+        - name
+        - email
+
+    UpdateProfileBody:
+      type: object
+      properties:
+        name:
+          type: string
+        college:
+          type: string
+        degree:
+          type: string
+        graduationYear:
+          type: integer
+        careerGoal:
+          type: string
+        preferredDomain:
+          type: string
+        interests:
+          type: array
+          items:
+            type: string
+        skills:
+          type: array
+          items:
+            type: string
+        profilePhotoUrl:
+          type: string
+
+    Project:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        problemSolved:
+          type: ["string", "null"]
+        technologies:
+          type: array
+          items:
+            type: string
+        difficultyLevel:
+          type: string
+          enum: [beginner, intermediate, advanced]
+        githubLink:
+          type: ["string", "null"]
+        liveLink:
+          type: ["string", "null"]
+        screenshotUrl:
+          type: ["string", "null"]
+        duration:
+          type: ["string", "null"]
+        role:
+          type: ["string", "null"]
+        category:
+          type: ["string", "null"]
+        completionStatus:
+          type: string
+          enum: [planning, in_progress, completed]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - title
+        - technologies
+        - difficultyLevel
+        - completionStatus
+        - createdAt
+        - updatedAt
+
+    CreateProjectBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        problemSolved:
+          type: string
+        technologies:
+          type: array
+          items:
+            type: string
+        difficultyLevel:
+          type: string
+          enum: [beginner, intermediate, advanced]
+        githubLink:
+          type: string
+        liveLink:
+          type: string
+        screenshotUrl:
+          type: string
+        duration:
+          type: string
+        role:
+          type: string
+        category:
+          type: string
+        completionStatus:
+          type: string
+          enum: [planning, in_progress, completed]
+      required:
+        - title
+        - technologies
+        - difficultyLevel
+        - completionStatus
+
+    UpdateProjectBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        problemSolved:
+          type: string
+        technologies:
+          type: array
+          items:
+            type: string
+        difficultyLevel:
+          type: string
+          enum: [beginner, intermediate, advanced]
+        githubLink:
+          type: string
+        liveLink:
+          type: string
+        screenshotUrl:
+          type: string
+        duration:
+          type: string
+        role:
+          type: string
+        category:
+          type: string
+        completionStatus:
+          type: string
+          enum: [planning, in_progress, completed]
+
+    TechComfortScore:
+      type: object
+      properties:
+        technology:
+          type: string
+        projectCount:
+          type: integer
+        comfortScore:
+          type: number
+        confidenceLevel:
+          type: string
+          enum: [low, medium, high]
+      required:
+        - technology
+        - projectCount
+        - comfortScore
+        - confidenceLevel
+
+    MarketDemandScore:
+      type: object
+      properties:
+        technology:
+          type: string
+        totalJobs:
+          type: integer
+        demandScore:
+          type: number
+        trendDirection:
+          type: string
+          enum: [rising, stable, declining]
+        growthRate:
+          type: number
+      required:
+        - technology
+        - totalJobs
+        - demandScore
+        - trendDirection
+        - growthRate
+
+    JobReadinessScore:
+      type: object
+      properties:
+        overallScore:
+          type: number
+        comfortComponent:
+          type: number
+        marketDemandComponent:
+          type: number
+        roadmapComponent:
+          type: number
+        portfolioComponent:
+          type: number
+        readinessStatus:
+          type: string
+          enum: [not_ready, needs_improvement, interview_ready, job_ready]
+        suggestions:
+          type: array
+          items:
+            type: string
+      required:
+        - overallScore
+        - comfortComponent
+        - marketDemandComponent
+        - roadmapComponent
+        - portfolioComponent
+        - readinessStatus
+        - suggestions
+
+    Roadmap:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        technology:
+          type: string
+        totalMilestones:
+          type: integer
+        completedMilestones:
+          type: integer
+        progressPercent:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - technology
+        - totalMilestones
+        - completedMilestones
+        - progressPercent
+        - createdAt
+
+    RoadmapDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        technology:
+          type: string
+        milestones:
+          type: array
+          items:
+            $ref: "#/components/schemas/Milestone"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - technology
+        - milestones
+        - createdAt
+
+    Milestone:
+      type: object
+      properties:
+        id:
+          type: integer
+        roadmapId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        orderIndex:
+          type: integer
+        estimatedDuration:
+          type: string
+        industryRelevance:
+          type: string
+        status:
+          type: string
+          enum: [not_started, in_progress, completed]
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Task"
+      required:
+        - id
+        - roadmapId
+        - title
+        - orderIndex
+        - estimatedDuration
+        - industryRelevance
+        - status
+        - tasks
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: integer
+        milestoneId:
+          type: integer
+        title:
+          type: string
+        completed:
+          type: boolean
+      required:
+        - id
+        - milestoneId
+        - title
+        - completed
+
+    GenerateRoadmapBody:
+      type: object
+      properties:
+        technology:
+          type: string
+      required:
+        - technology
+
+    Job:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        company:
+          type: string
+        location:
+          type: ["string", "null"]
+        experience:
+          type: ["string", "null"]
+        requiredSkills:
+          type: array
+          items:
+            type: string
+        salary:
+          type: ["string", "null"]
+        applyLink:
+          type: ["string", "null"]
+        source:
+          type: string
+        postedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - company
+        - requiredSkills
+        - source
+        - postedAt
+
+    JobMatch:
+      type: object
+      properties:
+        job:
+          $ref: "#/components/schemas/Job"
+        matchScore:
+          type: number
+        matchingSkills:
+          type: array
+          items:
+            type: string
+        missingSkills:
+          type: array
+          items:
+            type: string
+      required:
+        - job
+        - matchScore
+        - matchingSkills
+        - missingSkills
+
+    DashboardSummary:
+      type: object
+      properties:
+        totalProjects:
+          type: integer
+        completedProjects:
+          type: integer
+        strongestTech:
+          type: ["string", "null"]
+        readinessScore:
+          type: number
+        roadmapProgress:
+          type: number
+        totalJobMatches:
+          type: integer
+        profileComplete:
+          type: boolean
+      required:
+        - totalProjects
+        - completedProjects
+        - readinessScore
+        - roadmapProgress
+        - totalJobMatches
+        - profileComplete
+
+    SkillGap:
+      type: object
+      properties:
+        technology:
+          type: string
+        currentScore:
+          type: number
+        requiredScore:
+          type: number
+        gap:
+          type: number
+        priority:
+          type: string
+          enum: [low, medium, high, critical]
+        suggestion:
+          type: string
+      required:
+        - technology
+        - currentScore
+        - requiredScore
+        - gap
+        - priority
+        - suggestion
+
+    ActivityItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [project_added, project_updated, task_completed, milestone_completed, roadmap_created]
+        title:
+          type: string
+        description:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+      required:
+        - id
+        - type
+        - title
+        - description
+        - timestamp
