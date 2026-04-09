@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
+import { clerkClient } from "@clerk/express";
 import { db, usersTable, projectsTable, activityTable } from "@workspace/db";
 import {
   CreateProjectBody,
@@ -12,12 +13,30 @@ import {
   ListProjectsResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
 async function getUserId(clerkId: string): Promise<number | null> {
   const [user] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.clerkId, clerkId));
   return user?.id ?? null;
+}
+
+async function getOrCreateUserId(clerkId: string): Promise<number | null> {
+  const existing = await getUserId(clerkId);
+  if (existing) return existing;
+
+  try {
+    const clerkUser = await clerkClient.users.getUser(clerkId);
+    const name = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || "User";
+    const email = clerkUser.emailAddresses[0]?.emailAddress ?? "";
+    const [user] = await db.insert(usersTable).values({ clerkId, name, email }).returning({ id: usersTable.id });
+    logger.info({ clerkId }, "Auto-created user profile from Clerk data");
+    return user?.id ?? null;
+  } catch (err) {
+    logger.error({ clerkId, err }, "Failed to auto-create user from Clerk data");
+    return null;
+  }
 }
 
 router.get("/projects", requireAuth, async (req, res): Promise<void> => {
@@ -31,14 +50,19 @@ router.get("/projects", requireAuth, async (req, res): Promise<void> => {
 });
 
 router.post("/projects", requireAuth, async (req, res): Promise<void> => {
-  const userId = await getUserId((req as any).clerkUserId);
-  if (!userId) {
-    res.status(400).json({ error: "Create a profile first" });
-    return;
-  }
+  const clerkId = (req as any).clerkUserId;
+
   const parsed = CreateProjectBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
+    logger.warn({ clerkId, errors: parsed.error.flatten() }, "Invalid project body");
+    res.status(400).json({ error: "Invalid project data", details: parsed.error.flatten() });
+    return;
+  }
+
+  const userId = await getOrCreateUserId(clerkId);
+  if (!userId) {
+    logger.error({ clerkId }, "Could not resolve user ID for project creation");
+    res.status(500).json({ error: "Failed to resolve user account" });
     return;
   }
 
