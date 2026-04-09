@@ -204,7 +204,7 @@ export default function PortfolioDetail() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-3">
-                    <FormLabel>Technologies Used</FormLabel>
+                    <label className="text-sm font-medium leading-none">Technologies Used</label>
                     <div className="flex gap-2">
                       <Input 
                         value={techInput} 

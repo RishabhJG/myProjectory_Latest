@@ -234,7 +234,7 @@ export default function Profile() {
             </CardHeader>
             <CardContent className="space-y-8">
               <div className="space-y-3">
-                <FormLabel>Technical Skills</FormLabel>
+                <label className="text-sm font-medium leading-none">Technical Skills</label>
                 <div className="flex gap-2">
                   <Input 
                     value={skillInput} 
@@ -258,7 +258,7 @@ export default function Profile() {
               </div>
 
               <div className="space-y-3">
-                <FormLabel>Interests</FormLabel>
+                <label className="text-sm font-medium leading-none">Interests</label>
                 <div className="flex gap-2">
                   <Input 
                     value={interestInput} 
