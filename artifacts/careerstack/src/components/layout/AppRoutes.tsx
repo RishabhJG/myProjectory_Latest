@@ -10,6 +10,8 @@ import Jobs from "@/pages/jobs";
 import Profile from "@/pages/profile";
 import AdminDomains from "@/pages/admin/domains";
 import StackDetail from "@/pages/stacks/[id]";
+import JobsPage from "@/pages/jobs/index";
+import JobDetailPage from "@/pages/jobs/[id]";
 import NotFound from "@/pages/not-found";
 
 export function AppRoutes() {
@@ -26,6 +28,8 @@ export function AppRoutes() {
         <Route path="/admin/domains" component={AdminDomains} />
         <Route path="/stacks/:id" component={StackDetail} />
         <Route path="/profile" component={Profile} />
+        <Route path="/jobs" component={JobsPage} />
+        <Route path="/jobs/:id" component={JobDetailPage} />
         <Route component={NotFound} />
       </Switch>
     </AppLayout>

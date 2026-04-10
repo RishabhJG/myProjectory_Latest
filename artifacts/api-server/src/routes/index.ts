@@ -10,6 +10,7 @@ import domainsRouter from "./domains";
 import portfolioRouter from "./portfolio";
 import analysisRouter from "./analysis";
 import stacksRouter from "./stacks";
+import jobListingsRouter from "./job-listings";
 
 const router: IRouter = Router();
 
@@ -19,6 +20,7 @@ router.use(projectsRouter);
 router.use(scoresRouter);
 router.use(roadmapsRouter);
 router.use(jobsRouter);
+router.use(jobListingsRouter);
 router.use(dashboardRouter);
 router.use(domainsRouter);
 router.use(portfolioRouter);

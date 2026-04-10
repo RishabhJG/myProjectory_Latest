@@ -8,3 +8,6 @@ export * from "./domains";
 export * from "./portfolio";
 export * from "./scoring";
 export * from "./stack_map";
+export * from "./job_listings";
+export * from "./user_saved_jobs";
+export * from "./trends";

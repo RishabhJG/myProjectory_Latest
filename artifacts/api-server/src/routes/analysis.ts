@@ -24,6 +24,8 @@ async function getUserId(clerkId: string): Promise<number | null> {
 
 // ─── S3.4: Get current weights ────────────────────────────────────────────────
 
+router.get("/analysis/weights", requireAuth, async (req, res): Promise<void> => {
+  const userId = await getUserId((req as any).clerkUserId);
   const w = await getUserScoringWeights(userId);
   res.json({
     weights: [
