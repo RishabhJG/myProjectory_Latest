@@ -9,7 +9,7 @@ import {
   GetTrendAlignmentResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
-import { getAnalysisWeights, calculateReadinessScore } from "../services/scoring.service";
+import { getAnalysisWeights, getUserScoringWeights, calculateReadinessScore } from "../services/scoring.service";
 
 const router: IRouter = Router();
 
@@ -139,7 +139,7 @@ router.get("/scores/job-readiness", requireAuth, async (req, res): Promise<void>
 
   const portfolioComponent = Math.min(100, completedProjects.length * 25);
 
-  const weights = await getAnalysisWeights();
+  const weights = await getUserScoringWeights(userId);
   const overallScore = calculateReadinessScore(
     comfortComponent,
     marketDemandComponent,

@@ -5,3 +5,6 @@ export * from "./jobs";
 export * from "./activity";
 export * from "./analysis_config";
 export * from "./domains";
+export * from "./portfolio";
+export * from "./scoring";
+export * from "./stack_map";

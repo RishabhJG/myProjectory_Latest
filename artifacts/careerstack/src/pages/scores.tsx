@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { 
   useGetTechComfortScores, 
   useGetMarketDemandScores, 
@@ -8,9 +9,350 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Target, TrendingUp, Zap, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { Target, TrendingUp, Zap, AlertCircle, Settings2, BarChart3, Globe2, CheckCircle, XCircle, Loader2, Save, Info } from "lucide-react";
 import { motion } from "framer-motion";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import {
+  useGetWeights,
+  useSaveWeights,
+  useStrengthBreakdown,
+  useMarketAlignment,
+  type WeightEntry,
+} from "@/hooks/use-analysis-api";
+
+// ─── S3.4: Configure Scoring Weights ──────────────────────────────────────────
+
+const DIMENSION_LABELS: Record<string, string> = {
+  projects: "Projects",
+  skills: "Skills",
+  certifications: "Certifications",
+  trendAlignment: "Trend Alignment",
+  roadmapCompletion: "Roadmap Completion",
+  executionProgress: "Execution Progress",
+};
+
+const DIMENSION_COLORS: Record<string, string> = {
+  projects: "bg-blue-500",
+  skills: "bg-emerald-500",
+  certifications: "bg-amber-500",
+  trendAlignment: "bg-purple-500",
+  roadmapCompletion: "bg-cyan-500",
+  executionProgress: "bg-rose-500",
+};
+
+function WeightConfigPanel() {
+  const { data: weightsData, isLoading } = useGetWeights();
+  const saveWeights = useSaveWeights();
+  const [localWeights, setLocalWeights] = useState<WeightEntry[]>([]);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  useEffect(() => {
+    if (weightsData?.weights) {
+      setLocalWeights(weightsData.weights);
+    }
+  }, [weightsData]);
+
+  const totalWeight = localWeights.reduce((sum, w) => sum + w.weight, 0);
+  const isValid = totalWeight === 100;
+
+  const handleWeightChange = (dimension: string, newValue: number) => {
+    setLocalWeights(prev =>
+      prev.map(w => w.dimension === dimension ? { ...w, weight: newValue } : w)
+    );
+    setHasChanges(true);
+  };
+
+  const handleSave = () => {
+    if (!isValid) return;
+    saveWeights.mutate(localWeights, {
+      onSuccess: () => setHasChanges(false),
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <Card className="glass rounded-2xl border-border/50">
+        <CardContent className="py-8 flex justify-center">
+          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="glass rounded-2xl border-border/50">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Settings2 className="w-4 h-4 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-lg">Configure Scoring Weights</CardTitle>
+              <CardDescription>Adjust how each dimension impacts your readiness score</CardDescription>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge
+              variant={isValid ? "default" : "destructive"}
+              className={`text-sm px-3 py-1 ${isValid ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" : ""}`}
+            >
+              Total: {totalWeight}%
+              {isValid ? <CheckCircle className="w-3 h-3 ml-1" /> : <XCircle className="w-3 h-3 ml-1" />}
+            </Badge>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        {localWeights.map((w) => (
+          <div key={w.dimension} className="space-y-2">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <div className={`w-2.5 h-2.5 rounded-full ${DIMENSION_COLORS[w.dimension] || "bg-gray-500"}`} />
+                <span className="text-sm font-medium">{DIMENSION_LABELS[w.dimension] || w.dimension}</span>
+              </div>
+              <span className="text-sm font-bold text-primary w-12 text-right">{w.weight}%</span>
+            </div>
+            <Slider
+              value={[w.weight]}
+              onValueChange={(val) => handleWeightChange(w.dimension, val[0])}
+              max={100}
+              step={5}
+              className="w-full"
+            />
+          </div>
+        ))}
+
+        {!isValid && (
+          <div className="flex items-center gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>Weights must sum to exactly 100%. Currently at {totalWeight}%.</span>
+          </div>
+        )}
+
+        <Button
+          onClick={handleSave}
+          disabled={!isValid || !hasChanges || saveWeights.isPending}
+          className="w-full"
+        >
+          {saveWeights.isPending ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <Save className="w-4 h-4 mr-2" />
+          )}
+          Save Weights
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── S3.6: Strength Breakdown ─────────────────────────────────────────────────
+
+const DIMENSION_BAR_COLORS: Record<string, string> = {
+  projects: "bg-blue-500",
+  skills: "bg-emerald-500",
+  certifications: "bg-amber-500",
+  trendAlignment: "bg-purple-500",
+  roadmapCompletion: "bg-cyan-500",
+};
+
+function StrengthBreakdownSection() {
+  const { data, isLoading } = useStrengthBreakdown();
+
+  if (isLoading) {
+    return (
+      <Card className="glass rounded-2xl border-border/50">
+        <CardContent className="py-8 flex justify-center">
+          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!data || data.dimensions.length === 0) {
+    return null;
+  }
+
+  return (
+    <Card className="glass rounded-2xl border-border/50">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+            <BarChart3 className="w-4 h-4 text-emerald-600" />
+          </div>
+          <div>
+            <CardTitle className="text-lg">Strength Breakdown</CardTitle>
+            <CardDescription>Per-dimension scores weighted by your configuration</CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        {data.dimensions.map((dim, i) => {
+          const weightedScore = Math.round((dim.score * dim.weight) / 100);
+          return (
+            <motion.div
+              key={dim.dimension}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.05 }}
+              className="space-y-1.5"
+            >
+              <div className="flex justify-between items-center text-sm">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2.5 h-2.5 rounded-full ${DIMENSION_BAR_COLORS[dim.dimension] || "bg-gray-500"}`} />
+                  <span className="font-medium">{dim.label}</span>
+                  <span className="text-xs text-muted-foreground">({dim.weight}% weight)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">{dim.score}%</span>
+                  <Badge variant="outline" className="text-xs px-1.5 py-0">
+                    → {weightedScore}
+                  </Badge>
+                </div>
+              </div>
+              <div className="relative w-full h-2 rounded-full bg-muted overflow-hidden">
+                <motion.div
+                  className={`absolute left-0 top-0 h-full rounded-full ${DIMENSION_BAR_COLORS[dim.dimension] || "bg-gray-500"}`}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${dim.score}%` }}
+                  transition={{ duration: 0.8, delay: i * 0.1, ease: "easeOut" }}
+                />
+              </div>
+            </motion.div>
+          );
+        })}
+
+        {/* Insight */}
+        {data.insight && (
+          <div className="flex items-start gap-2 p-3 rounded-xl bg-primary/5 border border-primary/10 text-sm mt-4">
+            <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+            <span className="text-foreground leading-relaxed">{data.insight}</span>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── S3.8: Market Alignment ──────────────────────────────────────────────────
+
+function MarketAlignmentSection() {
+  const { data, isLoading } = useMarketAlignment();
+
+  if (isLoading) {
+    return (
+      <Card className="glass rounded-2xl border-border/50">
+        <CardContent className="py-8 flex justify-center">
+          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!data) return null;
+
+  // Graceful degradation for missing trend data
+  if (!data.trendDataAvailable) {
+    return (
+      <Card className="glass rounded-2xl border-border/50 border-amber-500/20">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+              <Globe2 className="w-4 h-4 text-amber-600" />
+            </div>
+            <div>
+              <CardTitle className="text-lg">Market Alignment</CardTitle>
+              <CardDescription>Trend data loading, check back soon</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-500/5 border border-amber-500/10 text-sm text-amber-700 dark:text-amber-400">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            <span>Market trend data is not yet populated. Once the trend engine processes job listings, your alignment score will appear here.</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const matchColor = data.matchPercentage >= 60 ? "text-emerald-600" : data.matchPercentage >= 30 ? "text-amber-600" : "text-red-500";
+
+  return (
+    <Card className="glass rounded-2xl border-border/50">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
+              <Globe2 className="w-4 h-4 text-purple-600" />
+            </div>
+            <div>
+              <CardTitle className="text-lg">Market Alignment</CardTitle>
+              <CardDescription>Your skills vs. top trending technologies</CardDescription>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className={`text-3xl font-bold ${matchColor}`}>{data.matchPercentage}%</div>
+            <div className="text-xs text-muted-foreground">match</div>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Match progress */}
+        <div className="relative w-full h-3 rounded-full bg-muted overflow-hidden">
+          <motion.div
+            className="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-purple-500 to-primary"
+            initial={{ width: 0 }}
+            animate={{ width: `${data.matchPercentage}%` }}
+            transition={{ duration: 1, ease: "easeOut" }}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Matched skills */}
+          {data.userMatchedSkills.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-emerald-600 mb-2 flex items-center gap-1.5">
+                <CheckCircle className="w-4 h-4" />
+                Skills You Have ({data.userMatchedSkills.length})
+              </h4>
+              <div className="flex flex-wrap gap-1.5">
+                {data.userMatchedSkills.map((skill) => (
+                  <Badge key={skill} variant="outline" className="bg-emerald-500/5 text-emerald-600 border-emerald-500/20 text-xs">
+                    {skill}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Skill gaps */}
+          {data.skillGaps.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-red-500 mb-2 flex items-center gap-1.5">
+                <XCircle className="w-4 h-4" />
+                Skill Gaps ({data.skillGaps.length})
+              </h4>
+              <div className="flex flex-wrap gap-1.5">
+                {data.skillGaps.map((gap) => (
+                  <Badge key={gap.skill} variant="outline" className="bg-red-500/5 text-red-500 border-red-500/20 text-xs">
+                    {gap.skill}
+                    <span className="ml-1 opacity-60">({gap.demandCount})</span>
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Main Scores Page ─────────────────────────────────────────────────────────
 
 export default function Scores() {
   const { data: comfortScores, isLoading: loadingComfort } = useGetTechComfortScores();
@@ -164,6 +506,15 @@ export default function Scores() {
           </Card>
         </div>
       )}
+
+      {/* S3.6: Strength Breakdown + S3.4: Weight Config */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <StrengthBreakdownSection />
+        <WeightConfigPanel />
+      </div>
+
+      {/* S3.8: Market Alignment */}
+      <MarketAlignmentSection />
 
       {readiness?.suggestions && readiness.suggestions.length > 0 && (
         <Card className="glass rounded-2xl border-primary/20 bg-primary/5">

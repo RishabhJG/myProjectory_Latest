@@ -9,6 +9,7 @@ import RoadmapDetail from "@/pages/roadmaps/[id]";
 import Jobs from "@/pages/jobs";
 import Profile from "@/pages/profile";
 import AdminDomains from "@/pages/admin/domains";
+import StackDetail from "@/pages/stacks/[id]";
 import NotFound from "@/pages/not-found";
 
 export function AppRoutes() {
@@ -23,6 +24,7 @@ export function AppRoutes() {
         <Route path="/roadmaps/:id" component={RoadmapDetail} />
         <Route path="/jobs" component={Jobs} />
         <Route path="/admin/domains" component={AdminDomains} />
+        <Route path="/stacks/:id" component={StackDetail} />
         <Route path="/profile" component={Profile} />
         <Route component={NotFound} />
       </Switch>

@@ -7,6 +7,9 @@ import roadmapsRouter from "./roadmaps";
 import jobsRouter from "./jobs";
 import dashboardRouter from "./dashboard";
 import domainsRouter from "./domains";
+import portfolioRouter from "./portfolio";
+import analysisRouter from "./analysis";
+import stacksRouter from "./stacks";
 
 const router: IRouter = Router();
 
@@ -18,5 +21,8 @@ router.use(roadmapsRouter);
 router.use(jobsRouter);
 router.use(dashboardRouter);
 router.use(domainsRouter);
+router.use(portfolioRouter);
+router.use(analysisRouter);
+router.use(stacksRouter);
 
 export default router;
