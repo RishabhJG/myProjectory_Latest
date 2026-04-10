@@ -1,5 +1,12 @@
-import { eq } from "drizzle-orm";
-import { db, analysisConfigTable, userScoreWeightsTable } from "@workspace/db";
+import { eq, and, count } from "drizzle-orm";
+import { 
+  db, 
+  analysisConfigTable, 
+  userScoreWeightsTable,
+  projectsTable,
+  userSkillsTable,
+  userCertificationsTable
+} from "@workspace/db";
 
 export interface ScoringWeights {
   projectsWeight: number;
@@ -10,7 +17,7 @@ export interface ScoringWeights {
   executionProgressWeight: number;
 }
 
-// Default fallback weights if nothing is configured
+// Default fallback weights if nothing is calculated
 const DEFAULT_WEIGHTS: ScoringWeights = {
   projectsWeight: 15,
   skillsWeight: 35,
@@ -20,40 +27,82 @@ const DEFAULT_WEIGHTS: ScoringWeights = {
   executionProgressWeight: 0,
 };
 
-// Map dimension names (from user_score_weights table) to ScoringWeights keys
-const DIMENSION_KEY_MAP: Record<string, keyof ScoringWeights> = {
-  projects: "projectsWeight",
-  skills: "skillsWeight",
-  certifications: "certificationsWeight",
-  trendAlignment: "trendAlignmentWeight",
-  roadmapCompletion: "roadmapCompletionWeight",
-  executionProgress: "executionProgressWeight",
-};
-
 /**
- * Get per-user scoring weights from user_score_weights table (S3.4).
- * Falls back to analysis_config table, then to hardcoded defaults.
+ * Automatically calculates scoring weights based on user portfolio content.
+ * Balanced approach: 50% fixed market/roadmap, 50% dynamic portfolio.
  */
-export async function getUserScoringWeights(userId: number): Promise<ScoringWeights> {
-  // 1. Try per-user weights first (S3.4)
-  const userWeights = await db
-    .select()
-    .from(userScoreWeightsTable)
-    .where(eq(userScoreWeightsTable.userId, userId));
+export async function calculateDynamicWeights(userId: number): Promise<ScoringWeights> {
+  // 1. Get counts for Projects, Skills, and Certifications
+  const [projectCount] = await db
+    .select({ val: count() })
+    .from(projectsTable)
+    .where(and(eq(projectsTable.userId, userId), eq(projectsTable.completionStatus, "completed")));
+  
+  const [skillCount] = await db
+    .select({ val: count() })
+    .from(userSkillsTable)
+    .where(eq(userSkillsTable.userId, userId));
 
-  if (userWeights.length > 0) {
-    const weights: ScoringWeights = { ...DEFAULT_WEIGHTS };
-    for (const row of userWeights) {
-      const key = DIMENSION_KEY_MAP[row.dimension];
-      if (key) {
-        weights[key] = row.weight;
-      }
-    }
-    return weights;
+  const [certCount] = await db
+    .select({ val: count() })
+    .from(userCertificationsTable)
+    .where(eq(userCertificationsTable.userId, userId));
+
+  const p = projectCount?.val || 0;
+  const s = skillCount?.val || 0;
+  const c = certCount?.val || 0;
+
+  // 2. Base distribution for Portfolio (50% total)
+  // Baseline: Projects (15), Skills (35), Certs (0)
+  let projW = 15;
+  let skillW = 35;
+  let certW = 0;
+
+  // 3. Dynamic Adjustments
+  
+  // Certifications take weight from Skills/Projects if present (max 15%)
+  if (c > 0) {
+    certW = Math.min(15, c * 5);
+    // Take from skills mostly, then projects
+    const takeFromSkills = Math.min(skillW - 10, Math.ceil(certW * 0.7));
+    skillW -= takeFromSkills;
+    projW -= (certW - takeFromSkills);
   }
 
-  // 2. Fallback to global analysis_config
-  return getAnalysisWeights();
+  // Volume balance: If user is heavily focused on projects, shift more weight there
+  if (p > 2 && p > s) {
+    // Project-heavy profile
+    const shift = Math.min(10, (p - s) * 2);
+    if (skillW > 15) {
+      skillW -= shift;
+      projW += shift;
+    }
+  } else if (s > 10 && s > p * 3) {
+    // Skill-heavy profile
+    const shift = Math.min(5, (s / 5));
+    if (projW > 10) {
+      projW -= shift;
+      skillW += shift;
+    }
+  }
+
+  return {
+    projectsWeight: projW,
+    skillsWeight: skillW,
+    certificationsWeight: certW,
+    trendAlignmentWeight: 25, // Fixed market anchor
+    roadmapCompletionWeight: 25, // Fixed progress anchor
+    executionProgressWeight: 0,
+  };
+}
+
+/**
+ * Get per-user scoring weights.
+ * Now defaults to dynamic portfolio-driven calculation.
+ */
+export async function getUserScoringWeights(userId: number): Promise<ScoringWeights> {
+  // The system now automatically adjusts based on portfolio content
+  return calculateDynamicWeights(userId);
 }
 
 /**

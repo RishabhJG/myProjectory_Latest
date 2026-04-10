@@ -10,19 +10,17 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
-import { Target, TrendingUp, Zap, AlertCircle, Settings2, BarChart3, Globe2, CheckCircle, XCircle, Loader2, Save, Info } from "lucide-react";
-import { motion } from "framer-motion";
-import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { Target, TrendingUp, Zap, AlertCircle, BarChart3, Globe2, CheckCircle, XCircle, Loader2, Info, Sparkles, Scale } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from "recharts";
 import {
   useGetWeights,
-  useSaveWeights,
   useStrengthBreakdown,
   useMarketAlignment,
   type WeightEntry,
 } from "@/hooks/use-analysis-api";
 
-// ─── S3.4: Configure Scoring Weights ──────────────────────────────────────────
+// ─── Dynamic Weighting Information ───────────────────────────────────────────
 
 const DIMENSION_LABELS: Record<string, string> = {
   projects: "Projects",
@@ -30,7 +28,6 @@ const DIMENSION_LABELS: Record<string, string> = {
   certifications: "Certifications",
   trendAlignment: "Trend Alignment",
   roadmapCompletion: "Roadmap Completion",
-  executionProgress: "Execution Progress",
 };
 
 const DIMENSION_COLORS: Record<string, string> = {
@@ -39,37 +36,11 @@ const DIMENSION_COLORS: Record<string, string> = {
   certifications: "bg-amber-500",
   trendAlignment: "bg-purple-500",
   roadmapCompletion: "bg-cyan-500",
-  executionProgress: "bg-rose-500",
 };
 
-function WeightConfigPanel() {
+function DynamicWeightingInfo() {
   const { data: weightsData, isLoading } = useGetWeights();
-  const saveWeights = useSaveWeights();
-  const [localWeights, setLocalWeights] = useState<WeightEntry[]>([]);
-  const [hasChanges, setHasChanges] = useState(false);
-
-  useEffect(() => {
-    if (weightsData?.weights) {
-      setLocalWeights(weightsData.weights);
-    }
-  }, [weightsData]);
-
-  const totalWeight = localWeights.reduce((sum, w) => sum + w.weight, 0);
-  const isValid = totalWeight === 100;
-
-  const handleWeightChange = (dimension: string, newValue: number) => {
-    setLocalWeights(prev =>
-      prev.map(w => w.dimension === dimension ? { ...w, weight: newValue } : w)
-    );
-    setHasChanges(true);
-  };
-
-  const handleSave = () => {
-    if (!isValid) return;
-    saveWeights.mutate(localWeights, {
-      onSuccess: () => setHasChanges(false),
-    });
-  };
+  const [showExplanation, setShowExplanation] = useState(false);
 
   if (isLoading) {
     return (
@@ -81,69 +52,80 @@ function WeightConfigPanel() {
     );
   }
 
+  const weights = weightsData?.weights || [];
+  const maxWeight = Math.max(...weights.map(w => w.weight));
+  const primaryFocus = weights.find(w => w.weight === maxWeight)?.dimension || "skills";
+
   return (
-    <Card className="glass rounded-2xl border-border/50">
-      <CardHeader>
+    <Card className="glass rounded-2xl border-border/50 overflow-hidden">
+      <CardHeader className="bg-primary/5 border-b border-primary/10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Settings2 className="w-4 h-4 text-primary" />
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+              <Scale className="w-4 h-4" />
             </div>
             <div>
-              <CardTitle className="text-lg">Configure Scoring Weights</CardTitle>
-              <CardDescription>Adjust how each dimension impacts your readiness score</CardDescription>
+              <CardTitle className="text-lg">Portfolio Weighting</CardTitle>
+              <CardDescription>Automatically optimized based on your activity</CardDescription>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Badge
-              variant={isValid ? "default" : "destructive"}
-              className={`text-sm px-3 py-1 ${isValid ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" : ""}`}
-            >
-              Total: {totalWeight}%
-              {isValid ? <CheckCircle className="w-3 h-3 ml-1" /> : <XCircle className="w-3 h-3 ml-1" />}
-            </Badge>
-          </div>
+          <Badge variant="outline" className="bg-emerald-500/5 text-emerald-600 border-emerald-500/20 gap-1.5 px-3">
+            <Sparkles className="w-3.5 h-3.5" />
+            {primaryFocus === 'projects' ? 'Project-First' : primaryFocus === 'skills' ? 'Skill-Focused' : 'Balanced'} Profile
+          </Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-5">
-        {localWeights.map((w) => (
-          <div key={w.dimension} className="space-y-2">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <div className={`w-2.5 h-2.5 rounded-full ${DIMENSION_COLORS[w.dimension] || "bg-gray-500"}`} />
-                <span className="text-sm font-medium">{DIMENSION_LABELS[w.dimension] || w.dimension}</span>
+      <CardContent className="pt-6 space-y-6">
+        <div className="space-y-4">
+          {weights.map((w, i) => (
+            <div key={w.dimension} className="space-y-1.5">
+              <div className="flex justify-between text-xs font-medium">
+                <span className="text-muted-foreground uppercase tracking-wider">{DIMENSION_LABELS[w.dimension] || w.dimension}</span>
+                <span>{w.weight}%</span>
               </div>
-              <span className="text-sm font-bold text-primary w-12 text-right">{w.weight}%</span>
+              <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                <motion.div
+                  className={`h-full ${DIMENSION_COLORS[w.dimension] || "bg-primary"}`}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${w.weight}%` }}
+                  transition={{ duration: 0.8, delay: i * 0.1 }}
+                />
+              </div>
             </div>
-            <Slider
-              value={[w.weight]}
-              onValueChange={(val) => handleWeightChange(w.dimension, val[0])}
-              max={100}
-              step={5}
-              className="w-full"
-            />
-          </div>
-        ))}
+          ))}
+        </div>
 
-        {!isValid && (
-          <div className="flex items-center gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>Weights must sum to exactly 100%. Currently at {totalWeight}%.</span>
-          </div>
-        )}
-
-        <Button
-          onClick={handleSave}
-          disabled={!isValid || !hasChanges || saveWeights.isPending}
-          className="w-full"
-        >
-          {saveWeights.isPending ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          ) : (
-            <Save className="w-4 h-4 mr-2" />
-          )}
-          Save Weights
-        </Button>
+        <div className="pt-2 border-t border-border/40">
+          <button 
+            onClick={() => setShowExplanation(!showExplanation)}
+            className="flex items-center gap-2 text-sm text-primary hover:underline font-medium"
+          >
+            <Info className="w-4 h-4" />
+            How are these weights calculated?
+          </button>
+          
+          <AnimatePresence>
+            {showExplanation && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="mt-4 p-4 rounded-xl bg-muted/30 border border-border/50 text-sm space-y-3">
+                  <p>Our <strong>Dynamic Scoring Engine</strong> automatically adjusts the importance of each category based on the depth of your portfolio:</p>
+                  <ul className="space-y-2 text-muted-foreground list-disc pl-4">
+                    <li>As you complete more <strong>Projects</strong>, the system increases their weight to reflect your practical experience.</li>
+                    <li>Higher proficiency in <strong>Technical Skills</strong> establishes a stronger baseline for your readiness.</li>
+                    <li><strong>Industry Certifications</strong> provide an additional boost by verifying your expertise.</li>
+                    <li>Common market standards (Trend Alignment & Progress) remain at a stable 25% each.</li>
+                  </ul>
+                  <p className="text-xs italic pt-2 border-t border-border/20">Manual configuration is disabled to ensure your score remains benchmarked against industry-validated standards.</p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </CardContent>
     </Card>
   );
@@ -177,7 +159,7 @@ function StrengthBreakdownSection() {
   }
 
   return (
-    <Card className="glass rounded-2xl border-border/50">
+    <Card className="glass rounded-2xl border-border/50 h-full">
       <CardHeader>
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
@@ -185,7 +167,7 @@ function StrengthBreakdownSection() {
           </div>
           <div>
             <CardTitle className="text-lg">Strength Breakdown</CardTitle>
-            <CardDescription>Per-dimension scores weighted by your configuration</CardDescription>
+            <CardDescription>Your performance across calibrated readiness metrics</CardDescription>
           </div>
         </div>
       </CardHeader>
@@ -204,12 +186,11 @@ function StrengthBreakdownSection() {
                 <div className="flex items-center gap-2">
                   <div className={`w-2.5 h-2.5 rounded-full ${DIMENSION_BAR_COLORS[dim.dimension] || "bg-gray-500"}`} />
                   <span className="font-medium">{dim.label}</span>
-                  <span className="text-xs text-muted-foreground">({dim.weight}% weight)</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">{dim.score}%</span>
-                  <Badge variant="outline" className="text-xs px-1.5 py-0">
-                    → {weightedScore}
+                  <span className="text-muted-foreground">{dim.score}% raw</span>
+                  <Badge variant="outline" className="text-xs px-1.5 py-0 bg-primary/5 border-primary/10">
+                    +{weightedScore} pts
                   </Badge>
                 </div>
               </div>
@@ -507,10 +488,10 @@ export default function Scores() {
         </div>
       )}
 
-      {/* S3.6: Strength Breakdown + S3.4: Weight Config */}
+      {/* S3.6: Strength Breakdown + Dynamic Weighting Info */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <StrengthBreakdownSection />
-        <WeightConfigPanel />
+        <DynamicWeightingInfo />
       </div>
 
       {/* S3.8: Market Alignment */}

@@ -24,22 +24,6 @@ async function getUserId(clerkId: string): Promise<number | null> {
 
 // ─── S3.4: Get current weights ────────────────────────────────────────────────
 
-router.get("/analysis/weights", requireAuth, async (req, res): Promise<void> => {
-  const userId = await getUserId((req as any).clerkUserId);
-  if (!userId) {
-    res.json({
-      weights: [
-        { dimension: "projects", weight: 15 },
-        { dimension: "skills", weight: 35 },
-        { dimension: "certifications", weight: 0 },
-        { dimension: "trendAlignment", weight: 25 },
-        { dimension: "roadmapCompletion", weight: 25 },
-        { dimension: "executionProgress", weight: 0 },
-      ],
-    });
-    return;
-  }
-
   const w = await getUserScoringWeights(userId);
   res.json({
     weights: [
@@ -48,7 +32,6 @@ router.get("/analysis/weights", requireAuth, async (req, res): Promise<void> => 
       { dimension: "certifications", weight: w.certificationsWeight },
       { dimension: "trendAlignment", weight: w.trendAlignmentWeight },
       { dimension: "roadmapCompletion", weight: w.roadmapCompletionWeight },
-      { dimension: "executionProgress", weight: w.executionProgressWeight },
     ],
   });
 });
@@ -56,53 +39,7 @@ router.get("/analysis/weights", requireAuth, async (req, res): Promise<void> => 
 // ─── S3.4: Save weights ──────────────────────────────────────────────────────
 
 router.put("/analysis/weights", requireAuth, async (req, res): Promise<void> => {
-  const userId = await getUserId((req as any).clerkUserId);
-  if (!userId) {
-    res.status(500).json({ error: "Failed to resolve user account" });
-    return;
-  }
-
-  const { weights } = req.body;
-  if (!Array.isArray(weights)) {
-    res.status(400).json({ error: "weights must be an array of { dimension, weight }" });
-    return;
-  }
-
-  const validDimensions = new Set([
-    "projects", "skills", "certifications",
-    "trendAlignment", "roadmapCompletion", "executionProgress",
-  ]);
-
-  let totalWeight = 0;
-  for (const w of weights) {
-    if (!validDimensions.has(w.dimension)) {
-      res.status(400).json({ error: `Invalid dimension: ${w.dimension}` });
-      return;
-    }
-    if (typeof w.weight !== "number" || w.weight < 0 || w.weight > 100) {
-      res.status(400).json({ error: `Invalid weight for ${w.dimension}: must be 0-100` });
-      return;
-    }
-    totalWeight += w.weight;
-  }
-
-  if (totalWeight !== 100) {
-    res.status(400).json({ error: `Weights must sum to 100 (got ${totalWeight})` });
-    return;
-  }
-
-  // Delete existing and insert new (upsert pattern)
-  await db.delete(userScoreWeightsTable).where(eq(userScoreWeightsTable.userId, userId));
-
-  for (const w of weights) {
-    await db.insert(userScoreWeightsTable).values({
-      userId,
-      dimension: w.dimension,
-      weight: w.weight,
-    });
-  }
-
-  res.json({ success: true, weights });
+  res.status(403).json({ error: "Manual weight configuration is disabled. Scoring weights are now automatically optimized based on your portfolio activity." });
 });
 
 // ─── S3.6: Strength Breakdown ─────────────────────────────────────────────────
