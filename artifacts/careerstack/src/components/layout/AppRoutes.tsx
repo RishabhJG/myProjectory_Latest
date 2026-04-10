@@ -12,6 +12,7 @@ import AdminDomains from "@/pages/admin/domains";
 import StackDetail from "@/pages/stacks/[id]";
 import JobsPage from "@/pages/jobs/index";
 import JobDetailPage from "@/pages/jobs/[id]";
+import MarketIntelligence from "@/pages/market-intelligence";
 import NotFound from "@/pages/not-found";
 
 export function AppRoutes() {
@@ -30,6 +31,7 @@ export function AppRoutes() {
         <Route path="/profile" component={Profile} />
         <Route path="/jobs" component={JobsPage} />
         <Route path="/jobs/:id" component={JobDetailPage} />
+        <Route path="/market-intelligence" component={MarketIntelligence} />
         <Route component={NotFound} />
       </Switch>
     </AppLayout>

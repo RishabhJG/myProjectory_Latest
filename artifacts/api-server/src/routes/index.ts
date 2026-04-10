@@ -11,6 +11,7 @@ import portfolioRouter from "./portfolio";
 import analysisRouter from "./analysis";
 import stacksRouter from "./stacks";
 import jobListingsRouter from "./job-listings";
+import jobIntelligenceRouter from "./job-intelligence";
 
 const router: IRouter = Router();
 
@@ -21,6 +22,7 @@ router.use(scoresRouter);
 router.use(roadmapsRouter);
 router.use(jobsRouter);
 router.use(jobListingsRouter);
+router.use(jobIntelligenceRouter);
 router.use(dashboardRouter);
 router.use(domainsRouter);
 router.use(portfolioRouter);

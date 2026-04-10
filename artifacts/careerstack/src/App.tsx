@@ -198,6 +198,7 @@ function ClerkProviderWithRoutes() {
               <Route path="/roadmaps/:id" component={() => <ProtectedRoute component={AppRoutes} />} />
               <Route path="/jobs" component={() => <ProtectedRoute component={AppRoutes} />} />
               <Route path="/admin/domains" component={() => <AdminProtectedRoute component={AppRoutes} />} />
+              <Route path="/market-intelligence" component={() => <ProtectedRoute component={AppRoutes} />} />
               <Route path="/profile" component={() => <ProtectedRoute component={AppRoutes} />} />
               <Route component={NotFound} />
             </Switch>

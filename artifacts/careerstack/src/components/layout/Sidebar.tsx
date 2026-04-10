@@ -7,7 +7,8 @@ import {
   Map, 
   Search, 
   User as UserIcon,
-  LogOut
+  LogOut,
+  TrendingUp
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +18,7 @@ const navItems = [
   { href: "/scores", label: "Scores & Readiness", icon: BarChart },
   { href: "/roadmaps", label: "Roadmaps", icon: Map },
   { href: "/jobs", label: "Jobs", icon: Search },
+  { href: "/market-intelligence", label: "Market Intel", icon: TrendingUp },
   { href: "/profile", label: "Profile", icon: UserIcon },
 ];
 

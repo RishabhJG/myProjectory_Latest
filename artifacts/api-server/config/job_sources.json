@@ -1,0 +1,11 @@
+{
+  "urls": [
+    "https://boards.greenhouse.io/example/jobs/123",
+    "https://jobs.lever.co/example/abc"
+  ],
+  "platforms": {
+    "greenhouse": { "enabled": true },
+    "lever": { "enabled": true },
+    "generic": { "enabled": true }
+  }
+}
