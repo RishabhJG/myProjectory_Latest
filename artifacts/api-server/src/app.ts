@@ -7,7 +7,7 @@ import { CLERK_PROXY_PATH, clerkProxyMiddleware } from "./middlewares/clerkProxy
 import router from "./routes";
 import { logger } from "./lib/logger";
 
-const FRONTEND_PORT = process.env.FRONTEND_PORT ?? "20594";
+const FRONTEND_PORT = process.env.FRONTEND_PORT ?? "5173";
 
 const app: Express = express();
 

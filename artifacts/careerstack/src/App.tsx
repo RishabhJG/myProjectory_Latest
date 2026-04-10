@@ -1,10 +1,21 @@
 import { useEffect, useRef } from "react";
-import { ClerkProvider, SignIn, SignUp, Show, useClerk, useAuth } from "@clerk/react";
+import {
+  ClerkFailed,
+  ClerkProvider,
+  ClerkLoaded,
+  ClerkLoading,
+  SignIn,
+  SignUp,
+  Show,
+  useClerk,
+  useAuth,
+} from "@clerk/react";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
 import { Switch, Route, Redirect, useLocation, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Spinner } from "@/components/ui/spinner";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import { AppRoutes } from "@/components/layout/AppRoutes";
@@ -45,15 +56,46 @@ function SignUpPage() {
   );
 }
 
+function AuthLoadingScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background text-foreground px-4">
+      <div className="flex flex-col items-center gap-3 text-center">
+        <Spinner className="size-6 text-primary" />
+        <div>
+          <p className="font-medium">Loading your workspace</p>
+          <p className="text-sm text-muted-foreground">Checking your authentication state...</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AuthFailedScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background text-foreground px-4">
+      <div className="max-w-md text-center space-y-2">
+        <h1 className="text-xl font-semibold">Authentication failed to load</h1>
+        <p className="text-sm text-muted-foreground">
+          Check your VITE_CLERK_PUBLISHABLE_KEY and internet connection, then refresh the page.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function ClerkApiTokenSync() {
-  const { getToken } = useAuth();
+  const { isLoaded, getToken } = useAuth();
 
   useEffect(() => {
+    if (!isLoaded) {
+      return;
+    }
+
     setAuthTokenGetter(() => getToken());
     return () => {
       setAuthTokenGetter(null);
     };
-  }, [getToken]);
+  }, [getToken, isLoaded]);
 
   return null;
 }
@@ -116,27 +158,35 @@ function ClerkProviderWithRoutes() {
       routerPush={(to) => setLocation(stripBase(to))}
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
     >
-      <QueryClientProvider client={queryClient}>
-        <ClerkApiTokenSync />
-        <ClerkQueryClientCacheInvalidator />
-        <TooltipProvider>
-          <Switch>
-            <Route path="/" component={HomeRedirect} />
-            <Route path="/sign-in/*?" component={SignInPage} />
-            <Route path="/sign-up/*?" component={SignUpPage} />
-            <Route path="/dashboard" component={() => <ProtectedRoute component={AppRoutes} />} />
-            <Route path="/portfolio" component={() => <ProtectedRoute component={AppRoutes} />} />
-            <Route path="/portfolio/:id" component={() => <ProtectedRoute component={AppRoutes} />} />
-            <Route path="/scores" component={() => <ProtectedRoute component={AppRoutes} />} />
-            <Route path="/roadmaps" component={() => <ProtectedRoute component={AppRoutes} />} />
-            <Route path="/roadmaps/:id" component={() => <ProtectedRoute component={AppRoutes} />} />
-            <Route path="/jobs" component={() => <ProtectedRoute component={AppRoutes} />} />
-            <Route path="/profile" component={() => <ProtectedRoute component={AppRoutes} />} />
-            <Route component={NotFound} />
-          </Switch>
-          <Toaster />
-        </TooltipProvider>
-      </QueryClientProvider>
+      <ClerkLoading>
+        <AuthLoadingScreen />
+      </ClerkLoading>
+      <ClerkFailed>
+        <AuthFailedScreen />
+      </ClerkFailed>
+      <ClerkLoaded>
+        <QueryClientProvider client={queryClient}>
+          <ClerkApiTokenSync />
+          <ClerkQueryClientCacheInvalidator />
+          <TooltipProvider>
+            <Switch>
+              <Route path="/" component={HomeRedirect} />
+              <Route path="/sign-in/*?" component={SignInPage} />
+              <Route path="/sign-up/*?" component={SignUpPage} />
+              <Route path="/dashboard" component={() => <ProtectedRoute component={AppRoutes} />} />
+              <Route path="/portfolio" component={() => <ProtectedRoute component={AppRoutes} />} />
+              <Route path="/portfolio/:id" component={() => <ProtectedRoute component={AppRoutes} />} />
+              <Route path="/scores" component={() => <ProtectedRoute component={AppRoutes} />} />
+              <Route path="/roadmaps" component={() => <ProtectedRoute component={AppRoutes} />} />
+              <Route path="/roadmaps/:id" component={() => <ProtectedRoute component={AppRoutes} />} />
+              <Route path="/jobs" component={() => <ProtectedRoute component={AppRoutes} />} />
+              <Route path="/profile" component={() => <ProtectedRoute component={AppRoutes} />} />
+              <Route component={NotFound} />
+            </Switch>
+            <Toaster />
+          </TooltipProvider>
+        </QueryClientProvider>
+      </ClerkLoaded>
     </ClerkProvider>
   );
 }

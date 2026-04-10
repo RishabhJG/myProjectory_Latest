@@ -2,7 +2,7 @@
  * Clerk Frontend API Proxy Middleware
  *
  * Proxies Clerk Frontend API requests through your domain, enabling Clerk
- * authentication on custom domains and .replit.app deployments without
+ * authentication on custom domains and deployments without
  * requiring CNAME DNS configuration.
  *
  * See: https://clerk.com/docs/guides/dashboard/dns-domains/proxy-fapi

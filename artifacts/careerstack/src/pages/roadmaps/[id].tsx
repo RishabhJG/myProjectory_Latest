@@ -1,7 +1,7 @@
 import { useParams, Link } from "wouter";
 import { useGetRoadmap, useToggleTask, getGetRoadmapQueryKey, getListRoadmapsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, CheckCircle2, Circle, Clock, Milestone as MilestoneIcon } from "lucide-react";

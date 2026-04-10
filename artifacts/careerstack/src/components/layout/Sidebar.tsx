@@ -61,7 +61,7 @@ export function Sidebar() {
 
         <div className="mt-auto pt-6 border-t border-border/50">
           <div className="flex items-center px-3 py-2">
-            <UserButton afterSignOutUrl="/" appearance={{
+            <UserButton appearance={{
               elements: {
                 avatarBox: "w-9 h-9"
               }
