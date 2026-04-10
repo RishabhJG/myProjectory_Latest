@@ -5,12 +5,14 @@
  * CareerStack AI API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { ActivityItemType } from "./activityItemType";
 
-export interface ActivityItem {
+export interface DomainResponse {
   id: number;
-  type: ActivityItemType;
-  title: string;
+  name: string;
   description: string;
-  timestamp: Date;
+  priority: number;
+  isVisible: boolean;
+  categories: string[];
+  roles: string[];
+  skills: string[];
 }

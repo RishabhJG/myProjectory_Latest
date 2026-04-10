@@ -1,4 +1,10 @@
-import { useGetTechComfortScores, useGetMarketDemandScores, useGetJobReadinessScore } from "@workspace/api-client-react";
+import { 
+  useGetTechComfortScores, 
+  useGetMarketDemandScores, 
+  useGetJobReadinessScore,
+  useGetStrengths,
+  useGetTrendAlignment
+} from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -10,8 +16,10 @@ export default function Scores() {
   const { data: comfortScores, isLoading: loadingComfort } = useGetTechComfortScores();
   const { data: demandScores, isLoading: loadingDemand } = useGetMarketDemandScores();
   const { data: readiness, isLoading: loadingReadiness } = useGetJobReadinessScore();
+  const { data: strengthsMap, isLoading: loadingStrengths } = useGetStrengths();
+  const { data: trendAlignment, isLoading: loadingTrend } = useGetTrendAlignment();
 
-  const isLoading = loadingComfort || loadingDemand || loadingReadiness;
+  const isLoading = loadingComfort || loadingDemand || loadingReadiness || loadingStrengths || loadingTrend;
 
   if (isLoading) {
     return (
@@ -118,18 +126,38 @@ export default function Scores() {
                   </ResponsiveContainer>
                 </div>
                 <div className="w-full md:w-1/2 space-y-4 flex flex-col justify-center">
-                  {comfortScores?.slice(0, 5).map((score) => (
-                    <div key={score.technology}>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="font-medium flex items-center">
-                          {score.technology}
-                          {score.confidenceLevel === 'high' && <Zap className="w-3 h-3 text-yellow-500 ml-1.5" />}
-                        </span>
-                        <span className="text-muted-foreground">{score.comfortScore}%</span>
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="font-semibold text-sm border-b pb-1">Top Strength Skills</h3>
+                    {strengthsMap && strengthsMap.confidenceLevel !== 'low' && (
+                      <Badge variant="outline" className="text-xs">
+                        <Zap className="w-3 h-3 text-yellow-500 mr-1" />
+                        {strengthsMap.confidenceLevel.toUpperCase()} CONFIDENCE
+                      </Badge>
+                    )}
+                  </div>
+                  {strengthsMap?.strengths.slice(0, 5).map((skill) => {
+                    const scoreObj = comfortScores?.find(s => s.technology === skill) || { comfortScore: 80 };
+                    return (
+                      <div key={skill}>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="font-medium">{skill}</span>
+                          <span className="text-muted-foreground">{scoreObj.comfortScore}%</span>
+                        </div>
+                        <Progress value={scoreObj.comfortScore} className="h-2" />
                       </div>
-                      <Progress value={score.comfortScore} className="h-2" />
+                    );
+                  })}
+                  
+                  {strengthsMap && strengthsMap.strongDomains.length > 0 && (
+                    <div className="mt-6">
+                      <h3 className="font-semibold text-sm border-b pb-1 mb-3">Strongest Domains</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {strengthsMap.strongDomains.map(domain => (
+                          <Badge key={domain} variant="secondary">{domain}</Badge>
+                        ))}
+                      </div>
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -151,6 +179,14 @@ export default function Scores() {
                   <span className="text-foreground leading-relaxed">{suggestion}</span>
                 </li>
               ))}
+              {trendAlignment && trendAlignment.missingHighDemandSkills.length > 0 && (
+                <li className="flex items-start">
+                  <div className="w-1.5 h-1.5 rounded-full bg-destructive mt-2 mr-3 shrink-0" />
+                  <span className="text-foreground leading-relaxed">
+                    <strong>Trend Gap:</strong> Consider building projects with {trendAlignment.missingHighDemandSkills.slice(0, 3).join(", ")} to align with current market demands.
+                  </span>
+                </li>
+              )}
             </ul>
           </CardContent>
         </Card>
@@ -158,8 +194,18 @@ export default function Scores() {
 
       <Card className="glass rounded-2xl border-border/50">
         <CardHeader>
-          <CardTitle>Market Demand Trends</CardTitle>
-          <CardDescription>How your skills align with current job postings</CardDescription>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle>Market Demand Trends</CardTitle>
+              <CardDescription>How your skills align with current job postings</CardDescription>
+            </div>
+            {trendAlignment && (
+              <div className="text-right">
+                <div className="text-3xl font-bold text-primary">{trendAlignment.matchPercentage}%</div>
+                <div className="text-xs text-muted-foreground">Market Alignment</div>
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

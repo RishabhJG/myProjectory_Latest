@@ -6,12 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type SkillGapPriority =
-  (typeof SkillGapPriority)[keyof typeof SkillGapPriority];
+export type GetStrengthsResponseConfidenceLevel =
+  (typeof GetStrengthsResponseConfidenceLevel)[keyof typeof GetStrengthsResponseConfidenceLevel];
 
-export const SkillGapPriority = {
+export const GetStrengthsResponseConfidenceLevel = {
   low: "low",
   medium: "medium",
   high: "high",
-  critical: "critical",
 } as const;

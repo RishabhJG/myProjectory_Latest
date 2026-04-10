@@ -218,6 +218,32 @@ paths:
               schema:
                 $ref: "#/components/schemas/JobReadinessScore"
 
+  /scores/strengths:
+    get:
+      operationId: getStrengths
+      tags: [scores]
+      summary: Get strength analysis
+      responses:
+        "200":
+          description: Strength analysis score
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetStrengthsResponse"
+
+  /scores/trend-alignment:
+    get:
+      operationId: getTrendAlignment
+      tags: [scores]
+      summary: Get user trend alignment check against market
+      responses:
+        "200":
+          description: Trend alignment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetTrendAlignmentResponse"
+
   /roadmaps:
     get:
       operationId: listRoadmaps
@@ -379,6 +405,93 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/ActivityItem"
+
+  /domains:
+    get:
+      operationId: listDomains
+      tags: [domains]
+      summary: List all domains
+      responses:
+        "200":
+          description: List of domains
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DomainResponse"
+    post:
+      operationId: createDomain
+      tags: [domains]
+      summary: Create a new domain
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDomainBody"
+      responses:
+        "201":
+          description: Domain created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DomainResponse"
+
+  /domains/{id}:
+    get:
+      operationId: getDomain
+      tags: [domains]
+      summary: Get domain by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Domain details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DomainResponse"
+    patch:
+      operationId: updateDomain
+      tags: [domains]
+      summary: Update a domain
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDomainBody"
+      responses:
+        "200":
+          description: Undated domain
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DomainResponse"
+    delete:
+      operationId: deleteDomain
+      tags: [domains]
+      summary: Delete a domain
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted domain
 
 components:
   schemas:
@@ -679,6 +792,102 @@ components:
         - portfolioComponent
         - readinessStatus
         - suggestions
+
+    GetStrengthsResponse:
+      type: object
+      properties:
+        strengths:
+          type: array
+          items:
+            type: string
+        strongDomains:
+          type: array
+          items:
+            type: string
+        confidenceLevel:
+          type: string
+          enum: [low, medium, high]
+      required:
+        - strengths
+        - strongDomains
+        - confidenceLevel
+
+    GetTrendAlignmentResponse:
+      type: object
+      properties:
+        matchPercentage:
+          type: number
+        missingHighDemandSkills:
+          type: array
+          items:
+            type: string
+      required:
+        - matchPercentage
+        - missingHighDemandSkills
+
+    DomainResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        priority:
+          type: integer
+        isVisible:
+          type: boolean
+        categories:
+          type: array
+          items:
+            type: string
+        roles:
+          type: array
+          items:
+            type: string
+        skills:
+          type: array
+          items:
+            type: string
+      required:
+        - id
+        - name
+        - description
+        - priority
+        - isVisible
+        - categories
+        - roles
+        - skills
+
+    CreateDomainBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        priority:
+          type: integer
+        isVisible:
+          type: boolean
+        categories:
+          type: array
+          items:
+            type: string
+        roles:
+          type: array
+          items:
+            type: string
+        skills:
+          type: array
+          items:
+            type: string
+      required:
+        - name
+        - description
+        - priority
+        - isVisible
 
     Roadmap:
       type: object

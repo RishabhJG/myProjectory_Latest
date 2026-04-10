@@ -9,6 +9,7 @@ import {
   Show,
   useClerk,
   useAuth,
+  useUser,
 } from "@clerk/react";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
 import { Switch, Route, Redirect, useLocation, Router as WouterRouter } from "wouter";
@@ -148,6 +149,22 @@ function ProtectedRoute({ component: Component }: { component: any }) {
   );
 }
 
+function AdminProtectedRoute({ component: Component }: { component: any }) {
+  const { user } = useUser();
+  const isAdmin = user?.publicMetadata?.role === "admin";
+
+  return (
+    <>
+      <Show when="signed-in">
+        {isAdmin ? <Component /> : <Redirect to="/dashboard" />}
+      </Show>
+      <Show when="signed-out">
+        <Redirect to="/sign-in" />
+      </Show>
+    </>
+  );
+}
+
 function ClerkProviderWithRoutes() {
   const [, setLocation] = useLocation();
 
@@ -180,6 +197,7 @@ function ClerkProviderWithRoutes() {
               <Route path="/roadmaps" component={() => <ProtectedRoute component={AppRoutes} />} />
               <Route path="/roadmaps/:id" component={() => <ProtectedRoute component={AppRoutes} />} />
               <Route path="/jobs" component={() => <ProtectedRoute component={AppRoutes} />} />
+              <Route path="/admin/domains" component={() => <AdminProtectedRoute component={AppRoutes} />} />
               <Route path="/profile" component={() => <ProtectedRoute component={AppRoutes} />} />
               <Route component={NotFound} />
             </Switch>

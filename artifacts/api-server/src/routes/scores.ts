@@ -5,8 +5,11 @@ import {
   GetTechComfortScoresResponse,
   GetMarketDemandScoresResponse,
   GetJobReadinessScoreResponse,
+  GetStrengthsResponse,
+  GetTrendAlignmentResponse,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
+import { getAnalysisWeights, calculateReadinessScore } from "../services/scoring.service";
 
 const router: IRouter = Router();
 
@@ -136,11 +139,13 @@ router.get("/scores/job-readiness", requireAuth, async (req, res): Promise<void>
 
   const portfolioComponent = Math.min(100, completedProjects.length * 25);
 
-  const overallScore = Math.round(
-    comfortComponent * 0.35 +
-    marketDemandComponent * 0.25 +
-    roadmapComponent * 0.25 +
-    portfolioComponent * 0.15
+  const weights = await getAnalysisWeights();
+  const overallScore = calculateReadinessScore(
+    comfortComponent,
+    marketDemandComponent,
+    roadmapComponent,
+    portfolioComponent,
+    weights
   );
 
   let readinessStatus: "not_ready" | "needs_improvement" | "interview_ready" | "job_ready" = "not_ready";
@@ -163,6 +168,98 @@ router.get("/scores/job-readiness", requireAuth, async (req, res): Promise<void>
     portfolioComponent,
     readinessStatus,
     suggestions,
+  }));
+});
+
+router.get("/scores/strengths", requireAuth, async (req, res): Promise<void> => {
+  const userId = await getUserId((req as any).clerkUserId);
+  if (!userId) {
+    res.json(GetStrengthsResponse.parse({ strengths: [], strongDomains: [], confidenceLevel: "low" }));
+    return;
+  }
+
+  const projects = await db.select().from(projectsTable).where(eq(projectsTable.userId, userId));
+  
+  const techMap: Record<string, number> = {};
+  const domainMap: Record<string, number> = {};
+
+  for (const project of projects) {
+    for (const tech of project.technologies) {
+      techMap[tech] = (techMap[tech] || 0) + 1;
+    }
+    if (project.category) {
+      domainMap[project.category] = (domainMap[project.category] || 0) + 1;
+    }
+  }
+
+  const strengths = Object.entries(techMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(entry => entry[0]);
+
+  const strongDomains = Object.entries(domainMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(entry => entry[0]);
+
+  let confidenceLevel: "low" | "medium" | "high" = "low";
+  if (projects.filter(p => p.completionStatus === "completed").length >= 3) {
+    confidenceLevel = "high";
+  } else if (projects.length >= 2) {
+    confidenceLevel = "medium";
+  }
+
+  res.json(GetStrengthsResponse.parse({
+    strengths,
+    strongDomains,
+    confidenceLevel,
+  }));
+});
+
+router.get("/scores/trend-alignment", requireAuth, async (req, res): Promise<void> => {
+  const userId = await getUserId((req as any).clerkUserId);
+  if (!userId) {
+    res.json(GetTrendAlignmentResponse.parse({ matchPercentage: 0, missingHighDemandSkills: [] }));
+    return;
+  }
+
+  const projects = await db.select().from(projectsTable).where(eq(projectsTable.userId, userId));
+  const userSkills = new Set(projects.flatMap(p => p.technologies.map(t => t.toLowerCase())));
+
+  const allJobs = await db.select().from(jobsTable);
+  const demandedSkills: Record<string, number> = {};
+  
+  for (const job of allJobs) {
+    for (const skill of job.requiredSkills) {
+      const s = skill.toLowerCase();
+      demandedSkills[s] = (demandedSkills[s] || 0) + 1;
+    }
+  }
+
+  const topDemanded = Object.entries(demandedSkills)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20); // Top 20 skills in market
+
+  let matchCount = 0;
+  const missingHighDemandSkills: string[] = [];
+
+  for (const [skill, count] of topDemanded) {
+    if (userSkills.has(skill)) {
+      matchCount++;
+    } else {
+      missingHighDemandSkills.push(skill);
+    }
+  }
+
+  const matchPercentage = topDemanded.length > 0 ? Math.round((matchCount / topDemanded.length) * 100) : 0;
+
+  // Format skills back to proper case slightly by retaining topDemanded string? 
+  // Actually topDemanded has lowercase. We'll just return the lowercase for now, or format it.
+  const formattedMissing = missingHighDemandSkills.slice(0, 5).map(s => s.charAt(0).toUpperCase() + s.slice(1));
+
+  res.json(GetTrendAlignmentResponse.parse({
+    matchPercentage,
+    missingHighDemandSkills: formattedMissing,
   }));
 });
 
