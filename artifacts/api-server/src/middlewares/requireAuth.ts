@@ -2,6 +2,13 @@ import { getAuth } from "@clerk/express";
 import type { Request, Response, NextFunction } from "express";
 
 export const requireAuth = (req: Request, res: Response, next: NextFunction) => {
+  // Development bypass for easy local testing without Clerk
+  if (process.env.NODE_ENV === "development" && process.env.SKIP_ADMIN_CHECK === "true") {
+    (req as any).clerkUserId = "dev_user_id";
+    next();
+    return;
+  }
+
   const auth = getAuth(req);
   const userId = auth?.sessionClaims?.userId || auth?.userId;
   if (!userId) {
@@ -15,8 +22,16 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
 import { clerkClient } from "@clerk/express";
 
 export const requireAdmin = async (req: Request, res: Response, next: NextFunction) => {
+  // Development bypass for easy local testing without setting up Clerk roles
+  if (process.env.NODE_ENV === "development" && process.env.SKIP_ADMIN_CHECK === "true") {
+    (req as any).clerkUserId = "mock_admin_id";
+    next();
+    return;
+  }
+
   const auth = getAuth(req);
   const userId = auth?.sessionClaims?.userId || auth?.userId;
+
   if (!userId) {
     res.status(401).json({ error: "Unauthorized" });
     return;

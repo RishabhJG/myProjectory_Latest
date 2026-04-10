@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "hello": "tsx ./src/hello.ts",
+    "scrape": "node --env-file=../.env --import tsx ./run_scrape.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {

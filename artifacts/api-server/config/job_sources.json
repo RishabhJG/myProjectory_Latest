@@ -1,11 +1,17 @@
 {
   "urls": [
-    "https://boards.greenhouse.io/example/jobs/123",
-    "https://jobs.lever.co/example/abc"
+    "https://www.naukri.com/fresher-software-engineering-jobs-in-vadodara-baroda",
+    "https://in.linkedin.com/jobs/software-engineer-jobs-vadodara"
   ],
   "platforms": {
-    "greenhouse": { "enabled": true },
-    "lever": { "enabled": true },
-    "generic": { "enabled": true }
+    "lever": {
+      "enabled": true
+    },
+    "generic": {
+      "enabled": true
+    },
+    "naukri": {
+      "enabled": true
+    }
   }
 }

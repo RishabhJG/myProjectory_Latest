@@ -12,7 +12,8 @@ import { sql } from "drizzle-orm";
 import { parseJobUrl, type ScrapedJobData } from "./parser";
 import { logger } from "../../lib/logger";
 
-const CONFIG_PATH = resolve(__dirname, "../../../config/job_sources.json");
+// Use project root (cwd) to locate config — import.meta.url resolves to dist/ after bundling
+const CONFIG_PATH = resolve(process.cwd(), "config/job_sources.json");
 
 interface JobSourcesConfig {
   urls: string[];

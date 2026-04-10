@@ -124,6 +124,7 @@ export default function MarketIntelligence() {
   const [newUrl, setNewUrl] = useState("");
   const [addingUrl, setAddingUrl] = useState(false);
   const [addUrlMessage, setAddUrlMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [scrapeError, setScrapeError] = useState<string | null>(null);
 
   // ─── Load trends on mount ──────────────────────────────────────────────
 
@@ -151,6 +152,7 @@ export default function MarketIntelligence() {
   async function handleScrape() {
     setScraping(true);
     setScrapeResult(null);
+    setScrapeError(null);
     try {
       const res = await fetchWithAuth("/jobs/scrape");
       if (res.ok) {
@@ -159,11 +161,11 @@ export default function MarketIntelligence() {
         // Reload trends after scraping
         await loadTrends();
       } else {
-        const err = await res.json();
-        console.error("Scrape failed:", err);
+        const err = await res.json().catch(() => ({ error: "Unknown error" }));
+        setScrapeError(err.error || `Server returned ${res.status}`);
       }
-    } catch (err) {
-      console.error("Scrape error:", err);
+    } catch (err: any) {
+      setScrapeError(err.message || "Network error — is the backend running?");
     } finally {
       setScraping(false);
     }
@@ -240,6 +242,32 @@ export default function MarketIntelligence() {
           </Button>
         </div>
       </div>
+
+      {/* ─── Scrape Error Alert ───────────────────────────────────── */}
+      <AnimatePresence>
+        {scrapeError && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="p-4 rounded-xl border border-red-500/30 bg-red-500/10 flex items-center gap-3"
+          >
+            <XCircle className="w-5 h-5 text-red-500 shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-red-600">Scrape Failed</p>
+              <p className="text-xs text-red-500/80 mt-0.5">{scrapeError}</p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setScrapeError(null)}
+              className="text-red-500 hover:text-red-600 shrink-0"
+            >
+              Dismiss
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ─── Stats Row ───────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
