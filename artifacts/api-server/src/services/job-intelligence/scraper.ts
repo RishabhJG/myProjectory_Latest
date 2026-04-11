@@ -11,6 +11,7 @@ import { db, scrapedJobPostingsTable, type InsertScrapedJobPosting } from "@work
 import { sql } from "drizzle-orm";
 import { parseJobUrl, type ScrapedJobData } from "./parser";
 import { logger } from "../../lib/logger";
+import { isNaukriListingUrl, scrapeNaukriListingPage } from "./naukriScraper";
 
 // Use project root (cwd) to locate config — import.meta.url resolves to dist/ after bundling
 const CONFIG_PATH = resolve(process.cwd(), "config/job_sources.json");
@@ -117,24 +118,42 @@ export async function scrapeAllSources(): Promise<{
   for (const url of config.urls) {
     try {
       logger.info({ url }, "Scraping job URL");
-      const data = await parseJobUrl(url);
 
-      if (data) {
-        await storeScrapedJob(data);
-        success++;
-        results.push({
-          url,
-          status: "success",
-          title: data.title,
-          stackCount: data.extractedStack.length,
-        });
-        logger.info(
-          { url, title: data.title, techs: data.extractedStack.length },
-          "Successfully scraped and stored job",
-        );
+      // Route Naukri listing URLs to the multi-page scraper
+      if (isNaukriListingUrl(url)) {
+        const naukriResults = await scrapeNaukriListingPage(url);
+        for (const data of naukriResults) {
+          await storeScrapedJob(data);
+          success++;
+          results.push({
+            url: data.sourceUrl,
+            status: "success",
+            title: data.title,
+            stackCount: data.extractedStack.length,
+          });
+        }
+        logger.info({ url, jobsFound: naukriResults.length }, "Naukri listing scrape complete");
       } else {
-        failed++;
-        results.push({ url, status: "failed", error: "Parser returned null" });
+        // Existing flow for generic, lever, greenhouse
+        const data = await parseJobUrl(url);
+
+        if (data) {
+          await storeScrapedJob(data);
+          success++;
+          results.push({
+            url,
+            status: "success",
+            title: data.title,
+            stackCount: data.extractedStack.length,
+          });
+          logger.info(
+            { url, title: data.title, techs: data.extractedStack.length },
+            "Successfully scraped and stored job",
+          );
+        } else {
+          failed++;
+          results.push({ url, status: "failed", error: "Parser returned null" });
+        }
       }
     } catch (error: any) {
       failed++;

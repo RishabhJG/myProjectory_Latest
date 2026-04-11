@@ -23,6 +23,7 @@
     "node-cron": "^4.2.1",
     "pino": "^9",
     "pino-http": "^10",
+    "playwright": "^1.42.1",
     "zod": "catalog:"
   },
   "devDependencies": {
