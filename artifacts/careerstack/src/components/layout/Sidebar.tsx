@@ -30,9 +30,9 @@ export function Sidebar() {
       <div className="flex flex-col h-full px-4 py-6">
         <div className="flex items-center space-x-2 mb-10 px-2">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-xl">C</span>
+            <span className="text-primary-foreground font-bold text-xl">V</span>
           </div>
-          <span className="text-xl font-bold tracking-tight text-foreground">CareerStack</span>
+          <span className="text-xl font-bold tracking-tight text-foreground">VertX</span>
         </div>
 
         <nav className="flex-1 space-y-2">

@@ -73,8 +73,15 @@ export async function analyzeTrends(): Promise<TrendAnalysisResult> {
   const stackCombos = detectStackCombinations(techsPerJob);
   const topCombos = stackCombos.slice(0, 3);
 
+  logger.info({ 
+    totalJobs: allJobs.length, 
+    uniqueTechs: sortedTechs.length, 
+    combinationsFound: stackCombos.length 
+  }, "Trend analysis computed frequencies and combinations");
+
   // Persist trends to database
   await persistTrends(sortedTechs);
+
 
   const result: TrendAnalysisResult = {
     top_technologies: top3,

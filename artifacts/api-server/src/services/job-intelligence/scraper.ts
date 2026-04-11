@@ -5,15 +5,40 @@
  * and stores results in the scraped_job_postings table.
  */
 
-import { readFileSync, writeFileSync } from "fs";
-import { resolve } from "path";
+import { readFileSync, writeFileSync, existsSync } from "fs";
+import { resolve, join } from "path";
 import { db, scrapedJobPostingsTable, type InsertScrapedJobPosting } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { parseJobUrl, type ScrapedJobData } from "./parser";
 import { logger } from "../../lib/logger";
+import { isNaukriListingUrl, scrapeNaukriListingPage } from "./naukriScraper";
 
-// Use project root (cwd) to locate config — import.meta.url resolves to dist/ after bundling
-const CONFIG_PATH = resolve(process.cwd(), "config/job_sources.json");
+// Robust path resolution for config file
+function resolveConfigPath(): string {
+  const cwd = process.cwd();
+  const pathsToTry = [
+    // If running from api-server directory
+    join(cwd, "config/job_sources.json"),
+    // If running from project root
+    join(cwd, "artifacts/api-server/config/job_sources.json"),
+    // Fallback based on __dirname (when bundled in dist)
+    // __dirname is usually artifacts/api-server/dist
+    join(__dirname, "../config/job_sources.json"),
+    // Hardcoded absolute path as last resort (based on common project structure)
+    resolve(cwd, "artifacts/api-server/config/job_sources.json")
+  ];
+
+  for (const p of pathsToTry) {
+    if (existsSync(p)) {
+      return p;
+    }
+  }
+
+  // Default to the most likely development path if none exist
+  return pathsToTry[1];
+}
+
+const CONFIG_PATH = resolveConfigPath();
 
 interface JobSourcesConfig {
   urls: string[];
@@ -117,24 +142,42 @@ export async function scrapeAllSources(): Promise<{
   for (const url of config.urls) {
     try {
       logger.info({ url }, "Scraping job URL");
-      const data = await parseJobUrl(url);
 
-      if (data) {
-        await storeScrapedJob(data);
-        success++;
-        results.push({
-          url,
-          status: "success",
-          title: data.title,
-          stackCount: data.extractedStack.length,
-        });
-        logger.info(
-          { url, title: data.title, techs: data.extractedStack.length },
-          "Successfully scraped and stored job",
-        );
+      // Route Naukri listing URLs to the multi-page scraper
+      if (isNaukriListingUrl(url)) {
+        const naukriResults = await scrapeNaukriListingPage(url);
+        for (const data of naukriResults) {
+          await storeScrapedJob(data);
+          success++;
+          results.push({
+            url: data.sourceUrl,
+            status: "success",
+            title: data.title,
+            stackCount: data.extractedStack.length,
+          });
+        }
+        logger.info({ url, jobsFound: naukriResults.length }, "Naukri listing scrape complete");
       } else {
-        failed++;
-        results.push({ url, status: "failed", error: "Parser returned null" });
+        // Existing flow for generic, lever, greenhouse
+        const data = await parseJobUrl(url);
+
+        if (data) {
+          await storeScrapedJob(data);
+          success++;
+          results.push({
+            url,
+            status: "success",
+            title: data.title,
+            stackCount: data.extractedStack.length,
+          });
+          logger.info(
+            { url, title: data.title, techs: data.extractedStack.length },
+            "Successfully scraped and stored job",
+          );
+        } else {
+          failed++;
+          results.push({ url, status: "failed", error: "Parser returned null" });
+        }
       }
     } catch (error: any) {
       failed++;

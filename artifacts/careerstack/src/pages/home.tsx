@@ -13,9 +13,9 @@ export default function Home() {
       <header className="py-6 px-8 max-w-7xl w-full mx-auto flex justify-between items-center z-10">
         <div className="flex items-center space-x-2">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-xl">C</span>
+            <span className="text-primary-foreground font-bold text-xl">V</span>
           </div>
-          <span className="text-xl font-bold tracking-tight">CareerStack AI</span>
+          <span className="text-xl font-bold tracking-tight">VertX</span>
         </div>
         <div className="space-x-4">
           <Link href="/sign-in">
