@@ -42,9 +42,11 @@ export async function analyzeTrends(): Promise<TrendAnalysisResult> {
   // Count frequencies
   const techCounts: Record<string, number> = {};
   const techsPerJob: string[][] = [];
+  let jobsWithNoTech = 0;
 
   for (const job of allJobs) {
     const stack = job.extractedStack || [];
+    if (stack.length === 0) jobsWithNoTech++;
     techsPerJob.push(stack);
 
     for (const tech of stack) {
@@ -85,6 +87,7 @@ export async function analyzeTrends(): Promise<TrendAnalysisResult> {
   logger.info(
     {
       totalJobs: allJobs.length,
+      jobsWithNoTech,
       uniqueTechs: sortedTechs.length,
       top3: top3.map((t) => t.name),
       topCombos: topCombos.map((c) => c.stack),

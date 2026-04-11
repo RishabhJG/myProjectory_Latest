@@ -164,9 +164,14 @@ export async function parseGenericJob(url: string): Promise<ScrapedJobData | nul
       timeout: 15000,
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Upgrade-Insecure-Requests": "1",
       },
     });
 
@@ -175,6 +180,7 @@ export async function parseGenericJob(url: string): Promise<ScrapedJobData | nul
     // Try to extract title
     const title =
       $('meta[property="og:title"]').attr("content") ||
+      $('meta[name="title"]').attr("content") ||
       $('h1[class*="title"], h1[class*="job"], h1[class*="position"]').first().text().trim() ||
       $("h1").first().text().trim() ||
       $("title").text().trim() ||
@@ -183,7 +189,8 @@ export async function parseGenericJob(url: string): Promise<ScrapedJobData | nul
     // Try to extract company
     const company =
       $('meta[property="og:site_name"]').attr("content") ||
-      $('[class*="company"], [class*="org"]').first().text().trim() ||
+      $('meta[name="author"]').attr("content") ||
+      $('[class*="company"], [class*="org"], [class*="employer"]').first().text().trim() ||
       new URL(url).hostname.replace("www.", "").split(".")[0] ||
       "Unknown Company";
 
@@ -193,7 +200,9 @@ export async function parseGenericJob(url: string): Promise<ScrapedJobData | nul
       '[class*="job-detail"]',
       '[class*="job-content"]',
       '[class*="posting-detail"]',
+      '[class*="jobDescription"]',
       '[id*="description"]',
+      '[id*="job-details"]',
       "article",
       "main",
     ];
@@ -208,6 +217,8 @@ export async function parseGenericJob(url: string): Promise<ScrapedJobData | nul
     }
 
     if (!description) {
+      // Fallback: exclude script and style tags when grabbing body text
+      $('script, style, nav, footer, header').remove();
       description = $("body").text().trim();
     }
 
@@ -215,13 +226,17 @@ export async function parseGenericJob(url: string): Promise<ScrapedJobData | nul
 
     // Extract location
     const location =
-      $('[class*="location"], [class*="locale"]').first().text().trim() || null;
+      $('[class*="location"], [class*="locale"], [class*="city"]').first().text().trim() || null;
 
     // Extract employment type
     const employmentType =
-      $('[class*="type"], [class*="employment"]').first().text().trim() || null;
+      $('[class*="type"], [class*="employment"], [class*="commitment"]').first().text().trim() || null;
 
     const extractedStack = extractTechStack(description);
+
+    if (extractedStack.length === 0) {
+      logger.warn({ url, title, company }, "Scraped job but found 0 technologies in description");
+    }
 
     return {
       title: title.slice(0, 300),
