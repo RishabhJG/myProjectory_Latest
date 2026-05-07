@@ -9,10 +9,13 @@ import RoadmapDetail from "@/pages/roadmaps/[id]";
 import Jobs from "@/pages/jobs";
 import Profile from "@/pages/profile";
 import AdminDomains from "@/pages/admin/domains";
+import AdminScraping from "@/pages/admin/scraping";
 import StackDetail from "@/pages/stacks/[id]";
 import JobsPage from "@/pages/jobs/index";
 import JobDetailPage from "@/pages/jobs/[id]";
 import MarketIntelligence from "@/pages/market-intelligence";
+import StudentPortfolios from "@/pages/student-portfolios";
+import PortfolioSharePage from "@/pages/portfolio-share";
 import NotFound from "@/pages/not-found";
 
 export function AppRoutes() {
@@ -27,11 +30,14 @@ export function AppRoutes() {
         <Route path="/roadmaps/:id" component={RoadmapDetail} />
         <Route path="/jobs" component={Jobs} />
         <Route path="/admin/domains" component={AdminDomains} />
+        <Route path="/admin/scraping" component={AdminScraping} />
         <Route path="/stacks/:id" component={StackDetail} />
         <Route path="/profile" component={Profile} />
         <Route path="/jobs" component={JobsPage} />
         <Route path="/jobs/:id" component={JobDetailPage} />
         <Route path="/market-intelligence" component={MarketIntelligence} />
+        <Route path="/student-portfolios" component={StudentPortfolios} />
+        <Route path="/portfolio-share/:shareId" component={PortfolioSharePage} />
         <Route component={NotFound} />
       </Switch>
     </AppLayout>

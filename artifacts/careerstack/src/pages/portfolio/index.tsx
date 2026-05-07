@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useListProjects, useDeleteProject, useListRoadmaps } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link } from "wouter";
-import { Plus, Github, Globe, ExternalLink, Trash2, Edit2, Briefcase, X, Award, Sparkles, Tag, Loader2, ExternalLink as LinkIcon } from "lucide-react";
+import { Plus, Github, Globe, ExternalLink, Trash2, Edit2, Briefcase, X, Award, Sparkles, Tag, Loader2, ExternalLink as LinkIcon, Copy, Download } from "lucide-react";
+import { generatePortfolioPDF } from "@/lib/pdf-generator";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
 import {
@@ -19,6 +20,9 @@ import {
   useListProjectStackTags,
   useTagProjectToStack,
   useRemoveProjectStackTag,
+  useGeneratePortfolio,
+  useGetPortfolioShare,
+  useUpsertPortfolioShare,
   type ProjectStackTag,
 } from "@/hooks/use-portfolio-api";
 
@@ -321,6 +325,156 @@ function CertificationsSection() {
   );
 }
 
+// ─── Portfolio Sharing Section ──────────────────────────────────────────────
+
+function PortfolioSharingSection() {
+  const { data: shareInfo, isLoading: loadingShare } = useGetPortfolioShare();
+  const generateQuery = useGeneratePortfolio({ query: { enabled: false } });
+  const upsertShare = useUpsertPortfolioShare();
+  const [visibility, setVisibility] = useState<"public" | "private">("private");
+  const [copied, setCopied] = useState(false);
+  const [downloadingPDF, setDownloadingPDF] = useState(false);
+
+  useEffect(() => {
+    if (shareInfo?.visibility) {
+      setVisibility(shareInfo.visibility);
+    }
+  }, [shareInfo]);
+
+  const shareUrl = useMemo(() => {
+    if (!shareInfo?.shareId) return "";
+    if (typeof window === "undefined") return `/portfolio-share/${shareInfo.shareId}`;
+    return `${window.location.origin}/portfolio-share/${shareInfo.shareId}`;
+  }, [shareInfo?.shareId]);
+
+  const handleCopy = async () => {
+    if (!shareUrl || !navigator.clipboard) return;
+    await navigator.clipboard.writeText(shareUrl);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1500);
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!generateQuery.data) return;
+    try {
+      setDownloadingPDF(true);
+      const portfolioData = {
+        user: generateQuery.data.user,
+        projects: generateQuery.data.projects,
+        skills: generateQuery.data.skills,
+        techStackSummary: generateQuery.data.techStackSummary,
+      };
+      await generatePortfolioPDF(portfolioData, `${generateQuery.data.user.name}-portfolio.pdf`);
+    } catch (error) {
+      console.error("Failed to download PDF:", error);
+    } finally {
+      setDownloadingPDF(false);
+    }
+  };
+
+  return (
+    <Card className="glass rounded-2xl border-border/50">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+            <LinkIcon className="w-4 h-4 text-indigo-600" />
+          </div>
+          <div>
+            <CardTitle className="text-lg">Generate & Share Portfolio</CardTitle>
+            <CardDescription>Publish your portfolio or share a private link.</CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant={visibility === "public" ? "default" : "secondary"}
+              onClick={() => setVisibility("public")}
+            >
+              Make Public
+            </Button>
+            <Button
+              type="button"
+              variant={visibility === "private" ? "default" : "secondary"}
+              onClick={() => setVisibility("private")}
+            >
+              Share Privately
+            </Button>
+          </div>
+          <Button
+            type="button"
+            onClick={() => upsertShare.mutate({ visibility })}
+            disabled={upsertShare.isPending || loadingShare}
+          >
+            {upsertShare.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+            {shareInfo ? "Update Share Settings" : "Create Share Link"}
+          </Button>
+        </div>
+
+        {shareUrl && (
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">Share Link</label>
+            <div className="flex flex-col md:flex-row gap-2 md:items-center">
+              <Input value={shareUrl} readOnly className="glass font-mono text-sm" />
+              <Button type="button" variant="secondary" onClick={handleCopy} className="md:shrink-0">
+                <Copy className="w-4 h-4 mr-2" />
+                {copied ? "Copied!" : "Copy"}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+          <div className="text-sm text-muted-foreground">
+            {visibility === "public"
+              ? "✓ Public portfolios appear in the Student Portfolios tab."
+              : "Private links stay hidden but can be shared with a GUID link."}
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => generateQuery.refetch()}
+            disabled={generateQuery.isFetching}
+          >
+            {generateQuery.isFetching ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+            Generate Portfolio
+          </Button>
+        </div>
+
+        {generateQuery.data && (
+          <div className="space-y-3">
+            <div className="rounded-xl border border-border/50 bg-muted/30 p-4 text-sm">
+              <div className="font-medium flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-primary" />
+                Portfolio Generated
+              </div>
+              <div className="text-muted-foreground mt-2">
+                {generateQuery.data.projects.length} completed projects · {generateQuery.data.skills.length} skills tracked
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleDownloadPDF}
+              disabled={downloadingPDF}
+              className="w-full md:w-auto"
+            >
+              {downloadingPDF ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4 mr-2" />
+              )}
+              Download as PDF
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Main Portfolio Page ──────────────────────────────────────────────────────
 
 export default function Portfolio() {
@@ -449,6 +603,8 @@ export default function Portfolio() {
         <SkillsSection />
         <CertificationsSection />
       </div>
+
+      <PortfolioSharingSection />
     </div>
   );
 }

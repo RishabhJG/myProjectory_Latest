@@ -47,3 +47,19 @@ export const projectStackTagsTable = pgTable("project_stack_tags", {
 export const insertProjectStackTagSchema = createInsertSchema(projectStackTagsTable).omit({ id: true, taggedAt: true });
 export type InsertProjectStackTag = z.infer<typeof insertProjectStackTagSchema>;
 export type ProjectStackTag = typeof projectStackTagsTable.$inferSelect;
+
+// ─── Portfolio Sharing ──────────────────────────────────────────────────────
+
+export const portfolioSharesTable = pgTable("portfolio_shares", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().unique().references(() => usersTable.id, { onDelete: "cascade" }),
+  shareId: text("share_id").notNull().unique(),
+  visibility: text("visibility").notNull().default("private"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+});
+
+export const insertPortfolioShareSchema = createInsertSchema(portfolioSharesTable)
+  .omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPortfolioShare = z.infer<typeof insertPortfolioShareSchema>;
+export type PortfolioShare = typeof portfolioSharesTable.$inferSelect;

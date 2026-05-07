@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
+import { randomUUID } from "crypto";
 import { clerkClient } from "@clerk/express";
 import {
   db,
@@ -10,6 +11,7 @@ import {
   projectsTable,
   roadmapsTable,
   activityTable,
+  portfolioSharesTable,
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { logger } from "../lib/logger";
@@ -27,6 +29,21 @@ async function getOrCreateUserId(clerkId: string): Promise<number | null> {
   const existing = await getUserId(clerkId);
   if (existing) return existing;
 
+  // Handle development mock users (bypass Clerk API lookup)
+  const isDevMockUser = process.env.NODE_ENV === "development" &&
+    (clerkId === "dev_user_id" || clerkId === "mock_admin_id");
+
+  if (isDevMockUser) {
+    logger.info({ clerkId }, "Creating development mock user in database...");
+    const [user] = await db.insert(usersTable).values({
+      clerkId,
+      name: clerkId === "mock_admin_id" ? "Admin User" : "Development User",
+      email: `${clerkId}@localhost`
+    }).returning({ id: usersTable.id });
+    logger.info({ clerkId, userId: user?.id }, "Auto-created development user profile");
+    return user?.id ?? null;
+  }
+
   try {
     const clerkUser = await clerkClient.users.getUser(clerkId);
     const name = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || "User";
@@ -38,6 +55,64 @@ async function getOrCreateUserId(clerkId: string): Promise<number | null> {
     logger.error({ clerkId, err }, "Failed to auto-create user from Clerk data");
     return null;
   }
+}
+
+function normalizeSkillName(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function buildTechStackSummary(technologies: string[]) {
+  const techCounts = new Map<string, number>();
+  technologies.forEach((tech) => {
+    const name = tech.trim();
+    if (!name) return;
+    techCounts.set(name, (techCounts.get(name) ?? 0) + 1);
+  });
+
+  return Array.from(techCounts.entries())
+    .map(([name, projectCount]) => ({ name, projectCount }))
+    .sort((a, b) => b.projectCount - a.projectCount || a.name.localeCompare(b.name));
+}
+
+async function buildPortfolioForUser(userId: number) {
+  const [user] = await db.select({
+    id: usersTable.id,
+    name: usersTable.name,
+    college: usersTable.college,
+    degree: usersTable.degree,
+    graduationYear: usersTable.graduationYear,
+    preferredDomain: usersTable.preferredDomain,
+    profilePhotoUrl: usersTable.profilePhotoUrl,
+    skills: usersTable.skills,
+  }).from(usersTable).where(eq(usersTable.id, userId));
+
+  if (!user) return null;
+
+  const projects = await db.select().from(projectsTable).where(and(
+    eq(projectsTable.userId, userId),
+    eq(projectsTable.completionStatus, "completed"),
+  ));
+
+  const skills = await db.select({
+    name: userSkillsTable.name,
+    proficiencyLevel: userSkillsTable.proficiencyLevel,
+  }).from(userSkillsTable).where(eq(userSkillsTable.userId, userId));
+
+  const projectTechnologies = projects.flatMap((project) => project.technologies || []);
+  const techStackSummary = buildTechStackSummary(projectTechnologies);
+
+  const normalizedProjects = projects.map((project) => ({
+    ...project,
+    completionDate: project.updatedAt ?? project.createdAt,
+  }));
+
+  return {
+    user,
+    projects: normalizedProjects,
+    skills,
+    techStackSummary,
+    generatedAt: new Date().toISOString(),
+  };
 }
 
 // ─── Skills ───────────────────────────────────────────────────────────────────
@@ -316,6 +391,261 @@ router.delete("/portfolio/projects/:id/stack-tags/:tagId", requireAuth, async (r
   }
 
   res.sendStatus(204);
+});
+
+// ─── Portfolio Generation & Sharing ─────────────────────────────────────────
+
+router.get("/portfolio/generate", requireAuth, async (req, res): Promise<void> => {
+  const userId = await getUserId((req as any).clerkUserId);
+  if (!userId) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  const portfolio = await buildPortfolioForUser(userId);
+  if (!portfolio) {
+    res.status(404).json({ error: "Portfolio not found" });
+    return;
+  }
+
+  res.json(portfolio);
+});
+
+router.get("/portfolio/share", requireAuth, async (req, res): Promise<void> => {
+  const userId = await getUserId((req as any).clerkUserId);
+  if (!userId) {
+    res.json(null);
+    return;
+  }
+
+  const [share] = await db.select().from(portfolioSharesTable).where(eq(portfolioSharesTable.userId, userId));
+  res.json(share ?? null);
+});
+
+router.post("/portfolio/share", requireAuth, async (req, res): Promise<void> => {
+  const userId = await getOrCreateUserId((req as any).clerkUserId);
+  if (!userId) {
+    res.status(500).json({ error: "Failed to resolve user account" });
+    return;
+  }
+
+  const visibility = typeof req.body?.visibility === "string" ? req.body.visibility : "private";
+  if (!(["public", "private"].includes(visibility))) {
+    res.status(400).json({ error: "Invalid visibility value" });
+    return;
+  }
+
+  const [existing] = await db.select().from(portfolioSharesTable)
+    .where(eq(portfolioSharesTable.userId, userId));
+
+  if (existing) {
+    const [updated] = await db.update(portfolioSharesTable)
+      .set({ visibility })
+      .where(eq(portfolioSharesTable.userId, userId))
+      .returning();
+    res.json(updated);
+    return;
+  }
+
+  const [created] = await db.insert(portfolioSharesTable).values({
+    userId,
+    shareId: randomUUID(),
+    visibility,
+  }).returning();
+
+  res.status(201).json(created);
+});
+
+router.get("/portfolio/share/:shareId", async (req, res): Promise<void> => {
+  const shareId = req.params.shareId;
+  if (!shareId) {
+    res.status(400).json({ error: "Share ID is required" });
+    return;
+  }
+
+  const [share] = await db.select().from(portfolioSharesTable)
+    .where(eq(portfolioSharesTable.shareId, shareId));
+  if (!share) {
+    res.status(404).json({ error: "Share link not found" });
+    return;
+  }
+
+  const portfolio = await buildPortfolioForUser(share.userId);
+  if (!portfolio) {
+    res.status(404).json({ error: "Portfolio not found" });
+    return;
+  }
+
+  res.json({
+    ...portfolio,
+    share: {
+      shareId: share.shareId,
+      visibility: share.visibility,
+    },
+  });
+});
+
+router.get("/portfolio/public", async (req, res): Promise<void> => {
+  const [shares, skillsFilter] = await Promise.all([
+    db.select({
+      shareId: portfolioSharesTable.shareId,
+      userId: portfolioSharesTable.userId,
+      visibility: portfolioSharesTable.visibility,
+      createdAt: portfolioSharesTable.createdAt,
+      updatedAt: portfolioSharesTable.updatedAt,
+      name: usersTable.name,
+      college: usersTable.college,
+      degree: usersTable.degree,
+      graduationYear: usersTable.graduationYear,
+      preferredDomain: usersTable.preferredDomain,
+      profilePhotoUrl: usersTable.profilePhotoUrl,
+      profileSkills: usersTable.skills,
+    })
+      .from(portfolioSharesTable)
+      .innerJoin(usersTable, eq(portfolioSharesTable.userId, usersTable.id))
+      .where(eq(portfolioSharesTable.visibility, "public")),
+    Promise.resolve(
+      typeof req.query.skills === "string"
+        ? req.query.skills.split(",").map((skill) => normalizeSkillName(skill)).filter(Boolean)
+        : []
+    ),
+  ]);
+
+  if (shares.length === 0) {
+    res.json([]);
+    return;
+  }
+
+  const userIds = shares.map((share) => share.userId);
+
+  const [skillRows, projectRows] = await Promise.all([
+    db.select({
+      userId: userSkillsTable.userId,
+      name: userSkillsTable.name,
+      proficiencyLevel: userSkillsTable.proficiencyLevel,
+    })
+      .from(userSkillsTable)
+      .where(inArray(userSkillsTable.userId, userIds)),
+    db.select({
+      userId: projectsTable.userId,
+      technologies: projectsTable.technologies,
+    })
+      .from(projectsTable)
+      .where(and(
+        inArray(projectsTable.userId, userIds),
+        eq(projectsTable.completionStatus, "completed"),
+      )),
+  ]);
+
+  const skillsByUser = new Map<number, { name: string; proficiencyLevel: string }[]>();
+  skillRows.forEach((row) => {
+    const existing = skillsByUser.get(row.userId) ?? [];
+    existing.push({ name: row.name, proficiencyLevel: row.proficiencyLevel });
+    skillsByUser.set(row.userId, existing);
+  });
+
+  const projectTechByUser = new Map<number, string[]>();
+  const projectCountByUser = new Map<number, number>();
+  projectRows.forEach((row) => {
+    const existing = projectTechByUser.get(row.userId) ?? [];
+    existing.push(...(row.technologies || []));
+    projectTechByUser.set(row.userId, existing);
+    projectCountByUser.set(row.userId, (projectCountByUser.get(row.userId) ?? 0) + 1);
+  });
+
+  const items = shares.map((share) => {
+    const userSkills = skillsByUser.get(share.userId) ?? [];
+    const projectTechs = projectTechByUser.get(share.userId) ?? [];
+    const profileSkills = share.profileSkills || [];
+    const allSkills = Array.from(new Set([
+      ...userSkills.map((skill) => skill.name),
+      ...projectTechs,
+      ...profileSkills,
+    ])).filter(Boolean);
+
+    const normalizedSkillSet = new Set(allSkills.map((skill) => normalizeSkillName(skill)));
+    const matchCount = skillsFilter.length === 0
+      ? 0
+      : skillsFilter.filter((skill) => normalizedSkillSet.has(skill)).length;
+
+    const techStackSummary = buildTechStackSummary(projectTechs).slice(0, 6);
+
+    return {
+      shareId: share.shareId,
+      visibility: share.visibility,
+      projectCount: projectCountByUser.get(share.userId) ?? 0,
+      matchCount,
+      topTechnologies: techStackSummary,
+      skills: allSkills,
+      user: {
+        name: share.name,
+        college: share.college,
+        degree: share.degree,
+        graduationYear: share.graduationYear,
+        preferredDomain: share.preferredDomain,
+        profilePhotoUrl: share.profilePhotoUrl,
+      },
+      updatedAt: share.updatedAt,
+    };
+  });
+
+  const filtered = skillsFilter.length > 0
+    ? items.filter((item) => item.matchCount > 0)
+    : items;
+
+  filtered.sort((a, b) => b.matchCount - a.matchCount || a.user.name.localeCompare(b.user.name));
+
+  res.json(filtered);
+});
+
+router.get("/portfolio/public/skills", async (_req, res): Promise<void> => {
+  const shares = await db.select({
+    userId: portfolioSharesTable.userId,
+    profileSkills: usersTable.skills,
+  })
+    .from(portfolioSharesTable)
+    .innerJoin(usersTable, eq(portfolioSharesTable.userId, usersTable.id))
+    .where(eq(portfolioSharesTable.visibility, "public"));
+
+  if (shares.length === 0) {
+    res.json([]);
+    return;
+  }
+
+  const userIds = shares.map((share) => share.userId);
+  const [skillRows, projectRows] = await Promise.all([
+    db.select({
+      userId: userSkillsTable.userId,
+      name: userSkillsTable.name,
+    }).from(userSkillsTable).where(inArray(userSkillsTable.userId, userIds)),
+    db.select({
+      userId: projectsTable.userId,
+      technologies: projectsTable.technologies,
+    })
+      .from(projectsTable)
+      .where(and(
+        inArray(projectsTable.userId, userIds),
+        eq(projectsTable.completionStatus, "completed"),
+      )),
+  ]);
+
+  const skillSet = new Set<string>();
+  shares.forEach((share) => {
+    (share.profileSkills || []).forEach((skill) => {
+      if (skill?.trim()) skillSet.add(skill.trim());
+    });
+  });
+  skillRows.forEach((row) => {
+    if (row.name?.trim()) skillSet.add(row.name.trim());
+  });
+  projectRows.forEach((row) => {
+    (row.technologies || []).forEach((tech) => {
+      if (tech?.trim()) skillSet.add(tech.trim());
+    });
+  });
+
+  const skills = Array.from(skillSet).sort((a, b) => a.localeCompare(b));
+  res.json(skills);
 });
 
 export default router;

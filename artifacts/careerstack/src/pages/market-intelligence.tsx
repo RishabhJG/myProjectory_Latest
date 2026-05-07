@@ -1,24 +1,16 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import {
   TrendingUp,
   Zap,
   Globe,
-  Plus,
-  RefreshCw,
   Trophy,
   BarChart3,
   Layers,
-  ExternalLink,
-  Loader2,
-  CheckCircle2,
-  XCircle,
   ArrowUp,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   BarChart,
   Bar,
@@ -49,20 +41,6 @@ interface TrendData {
   all_technologies: TechTrend[];
   total_jobs_analyzed: number;
   analyzed_at: string;
-}
-
-interface ScrapeResult {
-  scrape: {
-    total: number;
-    success: number;
-    failed: number;
-    results: { url: string; status: string; title?: string; stackCount?: number; error?: string }[];
-  };
-  trends: {
-    top_technologies: TechTrend[];
-    top_stack_combinations: StackCombo[];
-    total_jobs_analyzed: number;
-  };
 }
 
 // ─── API Helpers (direct fetch to avoid code-gen dependency) ────────────────
@@ -119,12 +97,6 @@ function RankMedal({ rank }: { rank: number }) {
 export default function MarketIntelligence() {
   const [trendData, setTrendData] = useState<TrendData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [scraping, setScraping] = useState(false);
-  const [scrapeResult, setScrapeResult] = useState<ScrapeResult | null>(null);
-  const [newUrl, setNewUrl] = useState("");
-  const [addingUrl, setAddingUrl] = useState(false);
-  const [addUrlMessage, setAddUrlMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [scrapeError, setScrapeError] = useState<string | null>(null);
 
   // ─── Load trends on mount ──────────────────────────────────────────────
 
@@ -144,55 +116,6 @@ export default function MarketIntelligence() {
       console.error("Failed to load trends:", err);
     } finally {
       setLoading(false);
-    }
-  }
-
-  // ─── Trigger Scrape ────────────────────────────────────────────────────
-
-  async function handleScrape() {
-    setScraping(true);
-    setScrapeResult(null);
-    setScrapeError(null);
-    try {
-      const res = await fetchWithAuth("/jobs/scrape");
-      if (res.ok) {
-        const data = await res.json();
-        setScrapeResult(data);
-        // Reload trends after scraping
-        await loadTrends();
-      } else {
-        const err = await res.json().catch(() => ({ error: "Unknown error" }));
-        setScrapeError(err.error || `Server returned ${res.status}`);
-      }
-    } catch (err: any) {
-      setScrapeError(err.message || "Network error — is the backend running?");
-    } finally {
-      setScraping(false);
-    }
-  }
-
-  // ─── Add Source URL ────────────────────────────────────────────────────
-
-  async function handleAddUrl() {
-    if (!newUrl.trim()) return;
-    setAddingUrl(true);
-    setAddUrlMessage(null);
-    try {
-      const res = await fetchWithAuth("/jobs/add-source", {
-        method: "POST",
-        body: JSON.stringify({ url: newUrl.trim() }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setAddUrlMessage({ type: "success", text: data.message });
-        setNewUrl("");
-      } else {
-        setAddUrlMessage({ type: "error", text: data.error || data.message });
-      }
-    } catch (err) {
-      setAddUrlMessage({ type: "error", text: "Failed to add URL" });
-    } finally {
-      setAddingUrl(false);
     }
   }
 
@@ -224,50 +147,10 @@ export default function MarketIntelligence() {
             Job Market Intelligence
           </h1>
           <p className="text-muted-foreground mt-1">
-            Real-time tech stack trends scraped from job postings across the market.
+            Real-time tech stack trends from job postings across the market.
           </p>
         </div>
-        <div className="flex gap-3">
-          <Button
-            onClick={handleScrape}
-            disabled={scraping}
-            className="rounded-xl bg-primary hover:bg-primary/90"
-          >
-            {scraping ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshCw className="w-4 h-4 mr-2" />
-            )}
-            {scraping ? "Scraping..." : "Run Scraper"}
-          </Button>
-        </div>
       </div>
-
-      {/* ─── Scrape Error Alert ───────────────────────────────────── */}
-      <AnimatePresence>
-        {scrapeError && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="p-4 rounded-xl border border-red-500/30 bg-red-500/10 flex items-center gap-3"
-          >
-            <XCircle className="w-5 h-5 text-red-500 shrink-0" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-red-600">Scrape Failed</p>
-              <p className="text-xs text-red-500/80 mt-0.5">{scrapeError}</p>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setScrapeError(null)}
-              className="text-red-500 hover:text-red-600 shrink-0"
-            >
-              Dismiss
-            </Button>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* ─── Stats Row ───────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -401,7 +284,7 @@ export default function MarketIntelligence() {
                 <Globe className="w-12 h-12 mx-auto text-muted-foreground/30 mb-4" />
                 <p className="text-muted-foreground font-medium">No trend data yet</p>
                 <p className="text-sm text-muted-foreground/70 mt-1">
-                  Add job source URLs below and run the scraper to start analyzing market trends.
+                  Market intelligence data will appear here once the admin runs the scraper.
                 </p>
               </div>
             )}
@@ -506,114 +389,6 @@ export default function MarketIntelligence() {
           </motion.div>
         </div>
       )}
-
-      {/* ─── Add Source URL ───────────────────────────────────────── */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}>
-        <Card className="glass rounded-2xl border-border/50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Globe className="w-5 h-5 text-primary" />
-              Manage Job Sources
-            </CardTitle>
-            <CardDescription>
-              Add job posting URLs from Greenhouse, Lever, or any company career page.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-3">
-              <Input
-                id="add-source-url"
-                placeholder="https://boards.greenhouse.io/company/jobs/123"
-                value={newUrl}
-                onChange={(e) => setNewUrl(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAddUrl()}
-                className="rounded-xl flex-1"
-              />
-              <Button
-                onClick={handleAddUrl}
-                disabled={addingUrl || !newUrl.trim()}
-                className="rounded-xl bg-primary hover:bg-primary/90"
-              >
-                {addingUrl ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
-                Add Source
-              </Button>
-            </div>
-            <AnimatePresence>
-              {addUrlMessage && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className={`mt-3 flex items-center gap-2 text-sm ${
-                    addUrlMessage.type === "success" ? "text-green-600" : "text-red-500"
-                  }`}
-                >
-                  {addUrlMessage.type === "success" ? (
-                    <CheckCircle2 className="w-4 h-4" />
-                  ) : (
-                    <XCircle className="w-4 h-4" />
-                  )}
-                  {addUrlMessage.text}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* ─── Scrape Results ──────────────────────────────────────── */}
-      <AnimatePresence>
-        {scrapeResult && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-          >
-            <Card className="glass rounded-2xl border-border/50">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <RefreshCw className="w-5 h-5 text-primary" />
-                  Latest Scrape Results
-                </CardTitle>
-                <CardDescription>
-                  {scrapeResult.scrape.success} of {scrapeResult.scrape.total} URLs scraped successfully
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {scrapeResult.scrape.results.map((result, i) => (
-                    <div
-                      key={i}
-                      className={`flex items-center justify-between p-3 rounded-lg border ${
-                        result.status === "success"
-                          ? "border-green-500/20 bg-green-500/5"
-                          : "border-red-500/20 bg-red-500/5"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        {result.status === "success" ? (
-                          <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
-                        ) : (
-                          <XCircle className="w-4 h-4 text-red-500 shrink-0" />
-                        )}
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">{result.title || result.url}</p>
-                          <p className="text-xs text-muted-foreground truncate">{result.url}</p>
-                        </div>
-                      </div>
-                      {result.stackCount !== undefined && (
-                        <Badge variant="outline" className="shrink-0 ml-2">
-                          {result.stackCount} techs
-                        </Badge>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

@@ -106,8 +106,9 @@ router.get("/jobs/scraped", requireAuth, async (req, res): Promise<void> => {
 });
 
 // ─── GET /jobs/sources — List configured source URLs ────────────────────────
+// Admin-only as this is part of source management
 
-router.get("/jobs/sources", requireAuth, async (_req, res): Promise<void> => {
+router.get("/jobs/sources", requireAdmin, async (_req, res): Promise<void> => {
   try {
     const config = loadJobSources();
     res.json(config);

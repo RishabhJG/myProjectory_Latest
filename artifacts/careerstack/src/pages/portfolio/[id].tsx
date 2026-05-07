@@ -102,6 +102,7 @@ export default function PortfolioDetail() {
       }
       setLocation("/portfolio");
     } catch (error) {
+      console.error("Project save error:", error);
       toast({ title: "Error", description: "Failed to save project.", variant: "destructive" });
     }
   };

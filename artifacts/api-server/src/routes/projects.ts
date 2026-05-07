@@ -26,6 +26,21 @@ async function getOrCreateUserId(clerkId: string): Promise<number | null> {
   const existing = await getUserId(clerkId);
   if (existing) return existing;
 
+  // Handle development mock users (bypass Clerk API lookup)
+  const isDevMockUser = process.env.NODE_ENV === "development" &&
+    (clerkId === "dev_user_id" || clerkId === "mock_admin_id");
+
+  if (isDevMockUser) {
+    logger.info({ clerkId }, "Creating development mock user in database...");
+    const [user] = await db.insert(usersTable).values({
+      clerkId,
+      name: clerkId === "mock_admin_id" ? "Admin User" : "Development User",
+      email: `${clerkId}@localhost`
+    }).returning({ id: usersTable.id });
+    logger.info({ clerkId, userId: user?.id }, "Auto-created development user profile");
+    return user?.id ?? null;
+  }
+
   try {
     const clerkUser = await clerkClient.users.getUser(clerkId);
     const name = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || "User";
