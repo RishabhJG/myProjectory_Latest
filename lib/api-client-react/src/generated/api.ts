@@ -35,7 +35,6 @@ import type {
   Project,
   Roadmap,
   RoadmapDetail,
-  SkillGap,
   Task,
   TechComfortScore,
   UpdateProfileBody,
@@ -1738,81 +1737,6 @@ export function useGetDashboardSummary<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetDashboardSummaryQueryOptions(options);
-
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-/**
- * @summary Get skill gap analysis
- */
-export const getGetSkillGapsUrl = () => {
-  return `/api/dashboard/skill-gaps`;
-};
-
-export const getSkillGaps = async (
-  options?: RequestInit,
-): Promise<SkillGap[]> => {
-  return customFetch<SkillGap[]>(getGetSkillGapsUrl(), {
-    ...options,
-    method: "GET",
-  });
-};
-
-export const getGetSkillGapsQueryKey = () => {
-  return [`/api/dashboard/skill-gaps`] as const;
-};
-
-export const getGetSkillGapsQueryOptions = <
-  TData = Awaited<ReturnType<typeof getSkillGaps>>,
-  TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getSkillGaps>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey = queryOptions?.queryKey ?? getGetSkillGapsQueryKey();
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getSkillGaps>>> = ({
-    signal,
-  }) => getSkillGaps({ signal, ...requestOptions });
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getSkillGaps>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
-
-export type GetSkillGapsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getSkillGaps>>
->;
-export type GetSkillGapsQueryError = ErrorType<unknown>;
-
-/**
- * @summary Get skill gap analysis
- */
-
-export function useGetSkillGaps<
-  TData = Awaited<ReturnType<typeof getSkillGaps>>,
-  TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getSkillGaps>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetSkillGapsQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

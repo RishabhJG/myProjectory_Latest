@@ -190,6 +190,7 @@ function ClerkProviderWithRoutes() {
               <Route path="/" component={HomeRedirect} />
               <Route path="/sign-in/*?" component={SignInPage} />
               <Route path="/sign-up/*?" component={SignUpPage} />
+              <Route path="/portfolio-share/:shareId" component={AppRoutes} />
               <Route path="/dashboard" component={() => <ProtectedRoute component={AppRoutes} />} />
               <Route path="/portfolio" component={() => <ProtectedRoute component={AppRoutes} />} />
               <Route path="/portfolio/:id" component={() => <ProtectedRoute component={AppRoutes} />} />

@@ -118,11 +118,7 @@ importers:
         specifier: ^10
         version: 10.5.0
       playwright:
-<<<<<<< HEAD
-        specifier: ^1.51.1
-=======
         specifier: ^1.42.1
->>>>>>> c98a46269256181b1544afab5ef0c55ce9188775
         version: 1.59.1
       zod:
         specifier: 'catalog:'

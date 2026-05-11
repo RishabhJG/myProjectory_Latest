@@ -6,8 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link } from "wouter";
-import { Plus, Github, Globe, ExternalLink, Trash2, Edit2, Briefcase, X, Award, Sparkles, Tag, Loader2, ExternalLink as LinkIcon, Copy, Download } from "lucide-react";
+import { Plus, Github, Globe, ExternalLink, Trash2, Edit2, Briefcase, X, Award, Sparkles, Tag, Loader2, ExternalLink as LinkIcon, Copy, Download, RefreshCw, CheckCircle2 } from "lucide-react";
 import { generatePortfolioPDF } from "@/lib/pdf-generator";
+import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
 import {
@@ -331,9 +332,11 @@ function PortfolioSharingSection() {
   const { data: shareInfo, isLoading: loadingShare } = useGetPortfolioShare();
   const generateQuery = useGeneratePortfolio({ query: { enabled: false } });
   const upsertShare = useUpsertPortfolioShare();
+  const { toast } = useToast();
   const [visibility, setVisibility] = useState<"public" | "private">("private");
   const [copied, setCopied] = useState(false);
   const [downloadingPDF, setDownloadingPDF] = useState(false);
+  const [linkJustCreated, setLinkJustCreated] = useState(false);
 
   useEffect(() => {
     if (shareInfo?.visibility) {
@@ -343,15 +346,41 @@ function PortfolioSharingSection() {
 
   const shareUrl = useMemo(() => {
     if (!shareInfo?.shareId) return "";
-    if (typeof window === "undefined") return `/portfolio-share/${shareInfo.shareId}`;
-    return `${window.location.origin}/portfolio-share/${shareInfo.shareId}`;
+    return `/portfolio-share/${shareInfo.shareId}`;
   }, [shareInfo?.shareId]);
 
   const handleCopy = async () => {
-    if (!shareUrl || !navigator.clipboard) return;
-    await navigator.clipboard.writeText(shareUrl);
+    if (!shareInfo?.shareId || !navigator.clipboard) return;
+    const fullUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/portfolio-share/${shareInfo.shareId}`;
+    await navigator.clipboard.writeText(fullUrl);
     setCopied(true);
+    toast({
+      title: "Link copied!",
+      description: "Share this link with anyone to showcase your portfolio.",
+    });
     window.setTimeout(() => setCopied(false), 1500);
+  };
+
+  const handleCreateLink = () => {
+    upsertShare.mutate({ visibility }, {
+      onSuccess: () => {
+        setLinkJustCreated(true);
+        toast({
+          title: "Portfolio link created!",
+          description: visibility === "public"
+            ? "Your portfolio is now visible to everyone on the Student Portfolios page."
+            : "Your private GUID link is ready to share.",
+        });
+        window.setTimeout(() => setLinkJustCreated(false), 3000);
+      },
+      onError: (error) => {
+        toast({
+          title: "Failed to create link",
+          description: error.message,
+          variant: "destructive",
+        });
+      },
+    });
   };
 
   const handleDownloadPDF = async () => {
@@ -365,8 +394,17 @@ function PortfolioSharingSection() {
         techStackSummary: generateQuery.data.techStackSummary,
       };
       await generatePortfolioPDF(portfolioData, `${generateQuery.data.user.name}-portfolio.pdf`);
+      toast({
+        title: "PDF downloaded!",
+        description: "Your portfolio has been saved as a PDF.",
+      });
     } catch (error) {
       console.error("Failed to download PDF:", error);
+      toast({
+        title: "Failed to download PDF",
+        description: "There was an error generating your PDF.",
+        variant: "destructive",
+      });
     } finally {
       setDownloadingPDF(false);
     }
@@ -381,7 +419,7 @@ function PortfolioSharingSection() {
           </div>
           <div>
             <CardTitle className="text-lg">Generate & Share Portfolio</CardTitle>
-            <CardDescription>Publish your portfolio or share a private link.</CardDescription>
+            <CardDescription>Publish your portfolio or share a private link with a unique GUID.</CardDescription>
           </div>
         </div>
       </CardHeader>
@@ -405,7 +443,7 @@ function PortfolioSharingSection() {
           </div>
           <Button
             type="button"
-            onClick={() => upsertShare.mutate({ visibility })}
+            onClick={handleCreateLink}
             disabled={upsertShare.isPending || loadingShare}
           >
             {upsertShare.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
@@ -414,23 +452,58 @@ function PortfolioSharingSection() {
         </div>
 
         {shareUrl && (
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-muted-foreground">Share Link</label>
-            <div className="flex flex-col md:flex-row gap-2 md:items-center">
-              <Input value={shareUrl} readOnly className="glass font-mono text-sm" />
-              <Button type="button" variant="secondary" onClick={handleCopy} className="md:shrink-0">
-                <Copy className="w-4 h-4 mr-2" />
-                {copied ? "Copied!" : "Copy"}
-              </Button>
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="space-y-2"
+          >
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+                {linkJustCreated && <CheckCircle2 className="w-4 h-4 text-green-500" />}
+                {visibility === "public" ? "Public Share Link (GUID)" : "Private Share Link (GUID)"}
+              </label>
+              {linkJustCreated && (
+                <Badge variant="outline" className="text-xs bg-green-500/10 text-green-700 border-green-500/20">
+                  Just created
+                </Badge>
+              )}
             </div>
-          </div>
+            <div className="flex flex-col md:flex-row gap-2 md:items-center">
+              <Input
+                value={shareUrl}
+                readOnly
+                className="glass font-mono text-xs md:text-sm break-all"
+              />
+              <div className="flex gap-2 md:shrink-0">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleCopy}
+                  className="shrink-0"
+                >
+                  <Copy className="w-4 h-4 mr-2" />
+                  {copied ? "Copied!" : "Copy"}
+                </Button>
+                <a href={shareUrl} target="_blank" rel="noreferrer">
+                  <Button type="button" variant="outline" className="shrink-0">
+                    <ExternalLink className="w-4 h-4 mr-1" />
+                    View
+                  </Button>
+                </a>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {visibility === "public"
+                ? "✓ This portfolio is visible to everyone. Find it on the Student Portfolios page."
+                : "🔒 Private portfolio. Only people with this GUID link can view it."}
+            </p>
+          </motion.div>
         )}
 
-        <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+        <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between pt-2 border-t border-border/50">
           <div className="text-sm text-muted-foreground">
-            {visibility === "public"
-              ? "✓ Public portfolios appear in the Student Portfolios tab."
-              : "Private links stay hidden but can be shared with a GUID link."}
+            {!shareUrl && "Create a share link to showcase your work"}
           </div>
           <Button
             type="button"
@@ -444,14 +517,16 @@ function PortfolioSharingSection() {
         </div>
 
         {generateQuery.data && (
-          <div className="space-y-3">
+          <div className="space-y-3 pt-2 border-t border-border/50">
             <div className="rounded-xl border border-border/50 bg-muted/30 p-4 text-sm">
               <div className="font-medium flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-primary" />
                 Portfolio Generated
               </div>
-              <div className="text-muted-foreground mt-2">
-                {generateQuery.data.projects.length} completed projects · {generateQuery.data.skills.length} skills tracked
+              <div className="text-muted-foreground mt-2 space-y-1">
+                <div>✓ {generateQuery.data.projects.length} completed projects</div>
+                <div>✓ {generateQuery.data.skills.length} skills tracked</div>
+                <div>✓ {generateQuery.data.techStackSummary.length} tech stacks identified</div>
               </div>
             </div>
             <Button

@@ -1,4 +1,4 @@
-import { useGetDashboardSummary, useGetRecentActivity, useGetSkillGaps } from "@workspace/api-client-react";
+import { useGetDashboardSummary, useGetRecentActivity } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Briefcase, Target, Map, Zap, CheckCircle2, TrendingUp, AlertTriangle } from "lucide-react";
@@ -9,9 +9,8 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 export default function Dashboard() {
   const { data: summary, isLoading: loadingSummary } = useGetDashboardSummary();
   const { data: activity, isLoading: loadingActivity } = useGetRecentActivity();
-  const { data: gaps, isLoading: loadingGaps } = useGetSkillGaps();
 
-  if (loadingSummary || loadingActivity || loadingGaps) {
+  if (loadingSummary || loadingActivity) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="animate-pulse flex flex-col items-center">
@@ -79,37 +78,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="glass rounded-2xl border-border/50 lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Skill Gaps</CardTitle>
-            <p className="text-sm text-muted-foreground">Areas to improve for your target roles</p>
-          </CardHeader>
-          <CardContent>
-            {gaps && gaps.length > 0 ? (
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={gaps} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
-                    <XAxis type="number" domain={[0, 100]} stroke="hsl(var(--muted-foreground))" />
-                    <YAxis dataKey="technology" type="category" stroke="hsl(var(--foreground))" tick={{fontSize: 12}} width={100} />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
-                      itemStyle={{ color: 'hsl(var(--foreground))' }}
-                    />
-                    <Bar dataKey="currentScore" name="Current Score" stackId="a" fill="hsl(var(--primary))" radius={[4, 0, 0, 4]} />
-                    <Bar dataKey="gap" name="Gap to Required" stackId="a" fill="hsl(var(--muted))" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                No skill gaps identified yet. Add more target roles to generate insights.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
+      <div className="grid grid-cols-1 gap-6">
         <Card className="glass rounded-2xl border-border/50">
           <CardHeader>
             <CardTitle>Recent Activity</CardTitle>

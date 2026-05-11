@@ -376,20 +376,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/DashboardSummary"
 
-  /dashboard/skill-gaps:
-    get:
-      operationId: getSkillGaps
-      tags: [dashboard]
-      summary: Get skill gap analysis
-      responses:
-        "200":
-          description: Skill gaps
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/SkillGap"
+
 
   /dashboard/recent-activity:
     get:
@@ -1078,29 +1065,6 @@ components:
         - totalJobMatches
         - profileComplete
 
-    SkillGap:
-      type: object
-      properties:
-        technology:
-          type: string
-        currentScore:
-          type: number
-        requiredScore:
-          type: number
-        gap:
-          type: number
-        priority:
-          type: string
-          enum: [low, medium, high, critical]
-        suggestion:
-          type: string
-      required:
-        - technology
-        - currentScore
-        - requiredScore
-        - gap
-        - priority
-        - suggestion
 
     ActivityItem:
       type: object

@@ -393,19 +393,6 @@ export const GetDashboardSummaryResponse = zod.object({
 });
 
 /**
- * @summary Get skill gap analysis
- */
-export const GetSkillGapsResponseItem = zod.object({
-  technology: zod.string(),
-  currentScore: zod.number(),
-  requiredScore: zod.number(),
-  gap: zod.number(),
-  priority: zod.enum(["low", "medium", "high", "critical"]),
-  suggestion: zod.string(),
-});
-export const GetSkillGapsResponse = zod.array(GetSkillGapsResponseItem);
-
-/**
  * @summary Get recent user activity
  */
 export const GetRecentActivityResponseItem = zod.object({

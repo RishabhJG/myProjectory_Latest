@@ -138,7 +138,6 @@ router.get("/analysis/market-alignment", requireAuth, async (req, res): Promise<
   if (!userId) {
     res.json({
       matchPercentage: 0,
-      skillGaps: [],
       userMatchedSkills: [],
       trendDataAvailable: false,
     });
@@ -161,7 +160,6 @@ router.get("/analysis/market-alignment", requireAuth, async (req, res): Promise<
     // Graceful degradation: no trend data
     res.json({
       matchPercentage: 0,
-      skillGaps: [],
       userMatchedSkills: [...userSkillSet],
       trendDataAvailable: false,
     });
@@ -183,13 +181,9 @@ router.get("/analysis/market-alignment", requireAuth, async (req, res): Promise<
 
   const totalTrending = topTrending.length;
   const userMatchedSkills: string[] = [];
-  const skillGaps: Array<{ skill: string; demandCount: number }> = [];
-
   for (const [skill, count] of topTrending) {
     if (userSkillSet.has(skill)) {
       userMatchedSkills.push(skill.charAt(0).toUpperCase() + skill.slice(1));
-    } else {
-      skillGaps.push({ skill: skill.charAt(0).toUpperCase() + skill.slice(1), demandCount: count });
     }
   }
 
@@ -197,7 +191,6 @@ router.get("/analysis/market-alignment", requireAuth, async (req, res): Promise<
 
   res.json({
     matchPercentage,
-    skillGaps: skillGaps.slice(0, 10),
     userMatchedSkills,
     trendDataAvailable: true,
   });

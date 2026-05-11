@@ -158,7 +158,7 @@ Career-Stack-AI/
 | GET | `/api/jobs` | List jobs (filterable) |
 | GET | `/api/jobs/matches` | Job matches for user |
 | GET | `/api/dashboard/summary` | Dashboard summary |
-| GET | `/api/dashboard/skill-gaps` | Skill gap analysis |
+
 | GET | `/api/dashboard/recent-activity` | Recent activity |
 
 ## Key Features
@@ -172,4 +172,4 @@ Career-Stack-AI/
 7. **Task Tracker** — Color-coded milestone/task progress tracking
 8. **Job Listings** — Seeded job data with tech filtering
 9. **Job Matching** — Skill-based job matching with match scores
-10. **Dashboard** — Summary stats, skill gaps, recent activity
+10. **Dashboard** — Summary stats, recent activity

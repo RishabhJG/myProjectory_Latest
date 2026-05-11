@@ -347,25 +347,6 @@ export interface DashboardSummary {
   profileComplete: boolean;
 }
 
-export type SkillGapPriority =
-  (typeof SkillGapPriority)[keyof typeof SkillGapPriority];
-
-export const SkillGapPriority = {
-  low: "low",
-  medium: "medium",
-  high: "high",
-  critical: "critical",
-} as const;
-
-export interface SkillGap {
-  technology: string;
-  currentScore: number;
-  requiredScore: number;
-  gap: number;
-  priority: SkillGapPriority;
-  suggestion: string;
-}
-
 export type ActivityItemType =
   (typeof ActivityItemType)[keyof typeof ActivityItemType];
 

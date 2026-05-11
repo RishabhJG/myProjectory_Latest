@@ -28,14 +28,8 @@ export interface StrengthBreakdownResponse {
   insight: string;
 }
 
-export interface SkillGap {
-  skill: string;
-  demandCount: number;
-}
-
 export interface MarketAlignmentResponse {
   matchPercentage: number;
-  skillGaps: SkillGap[];
   userMatchedSkills: string[];
   trendDataAvailable: boolean;
 }

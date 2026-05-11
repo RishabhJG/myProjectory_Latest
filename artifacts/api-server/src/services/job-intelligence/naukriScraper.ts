@@ -132,7 +132,6 @@ export async function scrapeNaukriListingPage(startUrl: string): Promise<Scraped
   const allJobs: ScrapedJobData[] = [];
   const visitedUrls = new Set<string>();
   
-<<<<<<< HEAD
   let browser;
   try {
     browser = await chromium.launch({ headless: true });
@@ -148,19 +147,13 @@ export async function scrapeNaukriListingPage(startUrl: string): Promise<Scraped
     throw err;
   }
 
-=======
-  const browser = await chromium.launch({ headless: true });
->>>>>>> c98a46269256181b1544afab5ef0c55ce9188775
   const context = await browser.newContext({
     userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
   });
   const page = await context.newPage();
 
   let currentUrl = startUrl;
-<<<<<<< HEAD
 
-=======
->>>>>>> c98a46269256181b1544afab5ef0c55ce9188775
   let pageCount = 0;
 
   try {

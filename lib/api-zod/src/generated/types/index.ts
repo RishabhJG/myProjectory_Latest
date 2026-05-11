@@ -34,8 +34,6 @@ export * from "./projectCompletionStatus";
 export * from "./projectDifficultyLevel";
 export * from "./roadmap";
 export * from "./roadmapDetail";
-export * from "./skillGap";
-export * from "./skillGapPriority";
 export * from "./task";
 export * from "./techComfortScore";
 export * from "./techComfortScoreConfidenceLevel";

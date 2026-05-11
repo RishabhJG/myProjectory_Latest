@@ -292,7 +292,7 @@ function MarketAlignmentSection() {
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           {/* Matched skills */}
           {data.userMatchedSkills.length > 0 && (
             <div>
@@ -310,23 +310,7 @@ function MarketAlignmentSection() {
             </div>
           )}
 
-          {/* Skill gaps */}
-          {data.skillGaps.length > 0 && (
-            <div>
-              <h4 className="text-sm font-semibold text-red-500 mb-2 flex items-center gap-1.5">
-                <XCircle className="w-4 h-4" />
-                Skill Gaps ({data.skillGaps.length})
-              </h4>
-              <div className="flex flex-wrap gap-1.5">
-                {data.skillGaps.map((gap) => (
-                  <Badge key={gap.skill} variant="outline" className="bg-red-500/5 text-red-500 border-red-500/20 text-xs">
-                    {gap.skill}
-                    <span className="ml-1 opacity-60">({gap.demandCount})</span>
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
+
         </div>
       </CardContent>
     </Card>
