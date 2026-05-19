@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { clerkClient } from "@clerk/express";
 import {
@@ -11,7 +11,8 @@ import {
   projectsTable,
   roadmapsTable,
   activityTable,
-  portfolioSharesTable,
+  portfoliosTable,
+  portfolioProjectsTable,
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/requireAuth";
 import { logger } from "../lib/logger";
@@ -57,62 +58,216 @@ async function getOrCreateUserId(clerkId: string): Promise<number | null> {
   }
 }
 
-function normalizeSkillName(value: string) {
-  return value.trim().toLowerCase();
+type PortfolioVisibility = "public" | "private";
+
+function isVisibility(value: unknown): value is PortfolioVisibility {
+  return value === "public" || value === "private";
 }
 
-function buildTechStackSummary(technologies: string[]) {
-  const techCounts = new Map<string, number>();
-  technologies.forEach((tech) => {
-    const name = tech.trim();
-    if (!name) return;
-    techCounts.set(name, (techCounts.get(name) ?? 0) + 1);
-  });
-
-  return Array.from(techCounts.entries())
-    .map(([name, projectCount]) => ({ name, projectCount }))
-    .sort((a, b) => b.projectCount - a.projectCount || a.name.localeCompare(b.name));
+function slugify(value: string): string {
+  const slug = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "")
+    .trim();
+  return slug || "portfolio";
 }
 
-async function buildPortfolioForUser(userId: number) {
-  const [user] = await db.select({
-    id: usersTable.id,
-    name: usersTable.name,
-    college: usersTable.college,
-    degree: usersTable.degree,
-    graduationYear: usersTable.graduationYear,
-    preferredDomain: usersTable.preferredDomain,
-    profilePhotoUrl: usersTable.profilePhotoUrl,
-    skills: usersTable.skills,
-  }).from(usersTable).where(eq(usersTable.id, userId));
+async function generateUniqueSlug(base: string, existingId?: number | null): Promise<string> {
+  let slug = base;
+  let suffix = 2;
+  while (true) {
+    const [existing] = await db
+      .select({ id: portfoliosTable.id })
+      .from(portfoliosTable)
+      .where(eq(portfoliosTable.slug, slug));
+    if (!existing || (existingId && existing.id === existingId)) {
+      return slug;
+    }
+    slug = `${base}-${suffix}`;
+    suffix += 1;
+  }
+}
 
-  if (!user) return null;
+function computeTechScores(projects: Array<{ technologies: string[]; difficultyLevel: string; completionStatus: string }>) {
+  const techMap: Record<string, { count: number; complexitySum: number; completedCount: number }> = {};
 
-  const projects = await db.select().from(projectsTable).where(and(
-    eq(projectsTable.userId, userId),
-    eq(projectsTable.completionStatus, "completed"),
-  ));
+  for (const project of projects) {
+    const complexity = project.difficultyLevel === "advanced" ? 3 : project.difficultyLevel === "intermediate" ? 2 : 1;
+    const completionScore = project.completionStatus === "completed"
+      ? 1
+      : project.completionStatus === "in_progress"
+      ? 0.5
+      : 0.2;
 
-  const skills = await db.select({
-    name: userSkillsTable.name,
-    proficiencyLevel: userSkillsTable.proficiencyLevel,
-  }).from(userSkillsTable).where(eq(userSkillsTable.userId, userId));
+    for (const tech of project.technologies || []) {
+      if (!techMap[tech]) {
+        techMap[tech] = { count: 0, complexitySum: 0, completedCount: 0 };
+      }
+      techMap[tech].count += 1;
+      techMap[tech].complexitySum += complexity * completionScore;
+      if (project.completionStatus === "completed") {
+        techMap[tech].completedCount += 1;
+      }
+    }
+  }
 
-  const projectTechnologies = projects.flatMap((project) => project.technologies || []);
-  const techStackSummary = buildTechStackSummary(projectTechnologies);
+  const maxPossible = Math.max(...Object.values(techMap).map((t) => t.complexitySum), 1);
 
-  const normalizedProjects = projects.map((project) => ({
-    ...project,
-    completionDate: project.updatedAt ?? project.createdAt,
-  }));
+  return Object.entries(techMap)
+    .map(([technology, data]) => {
+      const rawScore = (data.complexitySum / maxPossible) * 100;
+      const comfortScore = Math.min(100, Math.round(rawScore));
+      let confidenceLevel: "low" | "medium" | "high" = "low";
+      if (data.count >= 4) confidenceLevel = "high";
+      else if (data.count >= 2) confidenceLevel = "medium";
+
+      return {
+        technology,
+        projectCount: data.count,
+        comfortScore,
+        confidenceLevel,
+      };
+    })
+    .sort((a, b) => b.comfortScore - a.comfortScore);
+}
+
+function computePortfolioRating(projects: Array<{ difficultyLevel: string; completionStatus: string }>) {
+  return projects.reduce((sum, project) => {
+    const difficulty = project.difficultyLevel === "advanced" ? 3 : project.difficultyLevel === "intermediate" ? 2 : 1;
+    const completion = project.completionStatus === "completed" ? 1 : project.completionStatus === "in_progress" ? 0.5 : 0.2;
+    return sum + difficulty * completion;
+  }, 0);
+}
+
+type PortfolioRow = {
+  portfolioId: number;
+  studentId: number;
+  title: string;
+  bio: string | null;
+  avatarUrl: string | null;
+  theme: string;
+  visibility: PortfolioVisibility;
+  slug: string;
+  shareToken: string;
+  publishedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  studentName: string;
+  studentEmail: string;
+  studentAvatarUrl: string | null;
+  projectId: number | null;
+  projectTitle: string | null;
+  projectDescription: string | null;
+  projectTechnologies: string[] | null;
+  projectDifficulty: string | null;
+  projectCompletion: string | null;
+  projectGithub: string | null;
+  projectLive: string | null;
+  projectScreenshot: string | null;
+  projectDuration: string | null;
+  projectRole: string | null;
+  projectCategory: string | null;
+  projectCreatedAt: Date | null;
+  projectUpdatedAt: Date | null;
+  displayOrder: number | null;
+  isFeatured: boolean | null;
+};
+
+function buildPortfolioResponse(rows: PortfolioRow[]) {
+  if (rows.length === 0) return null;
+  const base = rows[0];
+  const projects = rows
+    .filter((row) => row.projectId)
+    .map((row) => ({
+      id: row.projectId as number,
+      title: row.projectTitle || "Untitled Project",
+      description: row.projectDescription,
+      technologies: row.projectTechnologies || [],
+      difficultyLevel: row.projectDifficulty || "beginner",
+      completionStatus: row.projectCompletion || "planning",
+      githubLink: row.projectGithub,
+      liveLink: row.projectLive,
+      screenshotUrl: row.projectScreenshot,
+      duration: row.projectDuration,
+      role: row.projectRole,
+      category: row.projectCategory,
+      createdAt: row.projectCreatedAt,
+      updatedAt: row.projectUpdatedAt,
+      displayOrder: row.displayOrder ?? 0,
+      isFeatured: row.isFeatured ?? false,
+    }))
+    .sort((a, b) => a.displayOrder - b.displayOrder);
+
+  const techScores = computeTechScores(projects);
+  const topTechs = techScores.slice(0, 4).map((t) => t.technology);
 
   return {
-    user,
-    projects: normalizedProjects,
-    skills,
-    techStackSummary,
-    generatedAt: new Date().toISOString(),
+    id: base.portfolioId,
+    studentId: base.studentId,
+    title: base.title,
+    bio: base.bio,
+    avatarUrl: base.avatarUrl || base.studentAvatarUrl,
+    theme: base.theme,
+    visibility: base.visibility,
+    slug: base.slug,
+    shareToken: base.shareToken,
+    publishedAt: base.publishedAt,
+    createdAt: base.createdAt,
+    updatedAt: base.updatedAt,
+    student: {
+      id: base.studentId,
+      name: base.studentName,
+      email: base.studentEmail,
+      avatarUrl: base.studentAvatarUrl,
+    },
+    projects,
+    projectsCount: projects.length,
+    techScores,
+    topTechs,
   };
+}
+
+async function getPortfolioRows(whereClause: any) {
+  return db
+    .select({
+      portfolioId: portfoliosTable.id,
+      studentId: portfoliosTable.studentId,
+      title: portfoliosTable.title,
+      bio: portfoliosTable.bio,
+      avatarUrl: portfoliosTable.avatarUrl,
+      theme: portfoliosTable.theme,
+      visibility: portfoliosTable.visibility,
+      slug: portfoliosTable.slug,
+      shareToken: portfoliosTable.shareToken,
+      publishedAt: portfoliosTable.publishedAt,
+      createdAt: portfoliosTable.createdAt,
+      updatedAt: portfoliosTable.updatedAt,
+      studentName: usersTable.name,
+      studentEmail: usersTable.email,
+      studentAvatarUrl: usersTable.profilePhotoUrl,
+      projectId: projectsTable.id,
+      projectTitle: projectsTable.title,
+      projectDescription: projectsTable.description,
+      projectTechnologies: projectsTable.technologies,
+      projectDifficulty: projectsTable.difficultyLevel,
+      projectCompletion: projectsTable.completionStatus,
+      projectGithub: projectsTable.githubLink,
+      projectLive: projectsTable.liveLink,
+      projectScreenshot: projectsTable.screenshotUrl,
+      projectDuration: projectsTable.duration,
+      projectRole: projectsTable.role,
+      projectCategory: projectsTable.category,
+      projectCreatedAt: projectsTable.createdAt,
+      projectUpdatedAt: projectsTable.updatedAt,
+      displayOrder: portfolioProjectsTable.displayOrder,
+      isFeatured: portfolioProjectsTable.isFeatured,
+    })
+    .from(portfoliosTable)
+    .innerJoin(usersTable, eq(usersTable.id, portfoliosTable.studentId))
+    .leftJoin(portfolioProjectsTable, eq(portfolioProjectsTable.portfolioId, portfoliosTable.id))
+    .leftJoin(projectsTable, eq(projectsTable.id, portfolioProjectsTable.projectId))
+    .where(whereClause);
 }
 
 // ─── Skills ───────────────────────────────────────────────────────────────────
@@ -393,259 +548,391 @@ router.delete("/portfolio/projects/:id/stack-tags/:tagId", requireAuth, async (r
   res.sendStatus(204);
 });
 
-// ─── Portfolio Generation & Sharing ─────────────────────────────────────────
+// ─── Portfolios ─────────────────────────────────────────────────────────────
 
-router.get("/portfolio/generate", requireAuth, async (req, res): Promise<void> => {
-  const userId = await getUserId((req as any).clerkUserId);
-  if (!userId) {
-    res.status(404).json({ error: "User not found" });
-    return;
-  }
-
-  const portfolio = await buildPortfolioForUser(userId);
-  if (!portfolio) {
-    res.status(404).json({ error: "Portfolio not found" });
-    return;
-  }
-
-  res.json(portfolio);
-});
-
-router.get("/portfolio/share", requireAuth, async (req, res): Promise<void> => {
-  const userId = await getUserId((req as any).clerkUserId);
-  if (!userId) {
-    res.json(null);
-    return;
-  }
-
-  const [share] = await db.select().from(portfolioSharesTable).where(eq(portfolioSharesTable.userId, userId));
-  res.json(share ?? null);
-});
-
-router.post("/portfolio/share", requireAuth, async (req, res): Promise<void> => {
+router.post("/portfolios/generate", requireAuth, async (req, res): Promise<void> => {
   const userId = await getOrCreateUserId((req as any).clerkUserId);
   if (!userId) {
     res.status(500).json({ error: "Failed to resolve user account" });
     return;
   }
 
-  const visibility = typeof req.body?.visibility === "string" ? req.body.visibility : "private";
-  if (!(["public", "private"].includes(visibility))) {
-    res.status(400).json({ error: "Invalid visibility value" });
+  const [user] = await db.select({ name: usersTable.name, avatarUrl: usersTable.profilePhotoUrl }).from(usersTable).where(eq(usersTable.id, userId));
+  const projects = await db.select().from(projectsTable).where(eq(projectsTable.userId, userId));
+  const [existingPortfolio] = await db.select().from(portfoliosTable).where(eq(portfoliosTable.studentId, userId));
+
+  const baseSlug = slugify(`${user?.name || "student"}-portfolio`);
+  const slug = existingPortfolio?.slug || await generateUniqueSlug(baseSlug, existingPortfolio?.id ?? null);
+  const shareToken = existingPortfolio?.shareToken || randomUUID();
+
+  const portfolio = await db.transaction(async (tx) => {
+    let portfolioId = existingPortfolio?.id ?? null;
+
+    if (!portfolioId) {
+      const [created] = await tx
+        .insert(portfoliosTable)
+        .values({
+          studentId: userId,
+          title: `${user?.name || "Student"}'s Portfolio`,
+          bio: null,
+          avatarUrl: user?.avatarUrl || null,
+          theme: "default",
+          visibility: "private",
+          slug,
+          shareToken,
+        })
+        .returning();
+      portfolioId = created?.id ?? null;
+    } else {
+      await tx
+        .update(portfoliosTable)
+        .set({
+          updatedAt: new Date(),
+          avatarUrl: existingPortfolio.avatarUrl || user?.avatarUrl || null,
+          slug,
+          shareToken,
+        })
+        .where(eq(portfoliosTable.id, portfolioId));
+    }
+
+    if (!portfolioId) {
+      return null;
+    }
+
+    const existingLinks = await tx
+      .select({ projectId: portfolioProjectsTable.projectId, displayOrder: portfolioProjectsTable.displayOrder, isFeatured: portfolioProjectsTable.isFeatured })
+      .from(portfolioProjectsTable)
+      .where(eq(portfolioProjectsTable.portfolioId, portfolioId));
+
+    const existingMap = new Map(existingLinks.map((link) => [link.projectId, link]));
+    const orderedProjects = projects
+      .map((project) => {
+        const existing = existingMap.get(project.id);
+        return {
+          projectId: project.id,
+          displayOrder: existing?.displayOrder ?? 9999,
+          isFeatured: existing?.isFeatured ?? false,
+          createdAt: project.createdAt,
+        };
+      })
+      .sort((a, b) => {
+        if (a.displayOrder !== b.displayOrder) return a.displayOrder - b.displayOrder;
+        return (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0);
+      })
+      .map((item, index) => ({
+        portfolioId,
+        projectId: item.projectId,
+        displayOrder: index + 1,
+        isFeatured: item.isFeatured,
+      }));
+
+    await tx.delete(portfolioProjectsTable).where(eq(portfolioProjectsTable.portfolioId, portfolioId));
+
+    if (orderedProjects.length > 0) {
+      await tx.insert(portfolioProjectsTable).values(orderedProjects);
+    }
+
+    return portfolioId;
+  });
+
+  if (!portfolio) {
+    res.status(500).json({ error: "Failed to generate portfolio" });
     return;
   }
 
-  const [existing] = await db.select().from(portfolioSharesTable)
-    .where(eq(portfolioSharesTable.userId, userId));
-
-  if (existing) {
-    const [updated] = await db.update(portfolioSharesTable)
-      .set({ visibility })
-      .where(eq(portfolioSharesTable.userId, userId))
-      .returning();
-    res.json(updated);
-    return;
-  }
-
-  const [created] = await db.insert(portfolioSharesTable).values({
-    userId,
-    shareId: randomUUID(),
-    visibility,
-  }).returning();
-
-  res.status(201).json(created);
+  const rows = await getPortfolioRows(eq(portfoliosTable.id, portfolio));
+  const response = buildPortfolioResponse(rows as PortfolioRow[]);
+  res.json(response);
 });
 
-router.get("/portfolio/share/:shareId", async (req, res): Promise<void> => {
-  const shareId = req.params.shareId;
-  if (!shareId) {
-    res.status(400).json({ error: "Share ID is required" });
-    return;
-  }
-
-  const [share] = await db.select().from(portfolioSharesTable)
-    .where(eq(portfolioSharesTable.shareId, shareId));
-  if (!share) {
-    res.status(404).json({ error: "Share link not found" });
-    return;
-  }
-
-  const portfolio = await buildPortfolioForUser(share.userId);
-  if (!portfolio) {
+router.get("/portfolios/my", requireAuth, async (req, res): Promise<void> => {
+  const userId = await getUserId((req as any).clerkUserId);
+  if (!userId) {
     res.status(404).json({ error: "Portfolio not found" });
     return;
   }
 
-  res.json({
-    ...portfolio,
-    share: {
-      shareId: share.shareId,
-      visibility: share.visibility,
-    },
-  });
-});
-
-router.get("/portfolio/public", async (req, res): Promise<void> => {
-  const [shares, skillsFilter] = await Promise.all([
-    db.select({
-      shareId: portfolioSharesTable.shareId,
-      userId: portfolioSharesTable.userId,
-      visibility: portfolioSharesTable.visibility,
-      createdAt: portfolioSharesTable.createdAt,
-      updatedAt: portfolioSharesTable.updatedAt,
-      name: usersTable.name,
-      college: usersTable.college,
-      degree: usersTable.degree,
-      graduationYear: usersTable.graduationYear,
-      preferredDomain: usersTable.preferredDomain,
-      profilePhotoUrl: usersTable.profilePhotoUrl,
-      profileSkills: usersTable.skills,
-    })
-      .from(portfolioSharesTable)
-      .innerJoin(usersTable, eq(portfolioSharesTable.userId, usersTable.id))
-      .where(eq(portfolioSharesTable.visibility, "public")),
-    Promise.resolve(
-      typeof req.query.skills === "string"
-        ? req.query.skills.split(",").map((skill) => normalizeSkillName(skill)).filter(Boolean)
-        : []
-    ),
-  ]);
-
-  if (shares.length === 0) {
-    res.json([]);
+  const rows = await getPortfolioRows(eq(portfoliosTable.studentId, userId));
+  const response = buildPortfolioResponse(rows as PortfolioRow[]);
+  if (!response) {
+    res.status(404).json({ error: "Portfolio not found" });
     return;
   }
 
-  const userIds = shares.map((share) => share.userId);
+  res.json(response);
+});
 
-  const [skillRows, projectRows] = await Promise.all([
-    db.select({
-      userId: userSkillsTable.userId,
-      name: userSkillsTable.name,
-      proficiencyLevel: userSkillsTable.proficiencyLevel,
-    })
-      .from(userSkillsTable)
-      .where(inArray(userSkillsTable.userId, userIds)),
-    db.select({
-      userId: projectsTable.userId,
-      technologies: projectsTable.technologies,
-    })
-      .from(projectsTable)
-      .where(and(
-        inArray(projectsTable.userId, userIds),
-        eq(projectsTable.completionStatus, "completed"),
-      )),
-  ]);
+router.patch("/portfolios/:id", requireAuth, async (req, res): Promise<void> => {
+  const userId = await getUserId((req as any).clerkUserId);
+  if (!userId) {
+    res.status(404).json({ error: "Portfolio not found" });
+    return;
+  }
 
-  const skillsByUser = new Map<number, { name: string; proficiencyLevel: string }[]>();
-  skillRows.forEach((row) => {
-    const existing = skillsByUser.get(row.userId) ?? [];
-    existing.push({ name: row.name, proficiencyLevel: row.proficiencyLevel });
-    skillsByUser.set(row.userId, existing);
+  const portfolioId = parseInt(req.params.id);
+  if (isNaN(portfolioId)) {
+    res.status(400).json({ error: "Invalid portfolio ID" });
+    return;
+  }
+
+  const [portfolio] = await db.select().from(portfoliosTable).where(eq(portfoliosTable.id, portfolioId));
+  if (!portfolio || portfolio.studentId !== userId) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const { title, bio, visibility, theme } = req.body || {};
+  const update: Partial<typeof portfoliosTable.$inferInsert> = {};
+
+  if (title && typeof title === "string") update.title = title.trim();
+  if (bio !== undefined && (typeof bio === "string" || bio === null)) update.bio = bio ? bio.trim() : null;
+  if (theme && typeof theme === "string") update.theme = theme.trim();
+  if (visibility !== undefined) {
+    if (!isVisibility(visibility)) {
+      res.status(400).json({ error: "Invalid visibility value" });
+      return;
+    }
+    update.visibility = visibility;
+  }
+
+  if (Object.keys(update).length === 0) {
+    res.status(400).json({ error: "No valid fields to update" });
+    return;
+  }
+
+  await db.update(portfoliosTable).set(update).where(eq(portfoliosTable.id, portfolioId));
+
+  const rows = await getPortfolioRows(eq(portfoliosTable.id, portfolioId));
+  const response = buildPortfolioResponse(rows as PortfolioRow[]);
+  res.json(response);
+});
+
+router.patch("/portfolios/:id/projects", requireAuth, async (req, res): Promise<void> => {
+  const userId = await getUserId((req as any).clerkUserId);
+  if (!userId) {
+    res.status(404).json({ error: "Portfolio not found" });
+    return;
+  }
+
+  const portfolioId = parseInt(req.params.id);
+  if (isNaN(portfolioId)) {
+    res.status(400).json({ error: "Invalid portfolio ID" });
+    return;
+  }
+
+  const { projects } = req.body || {};
+  if (!Array.isArray(projects)) {
+    res.status(400).json({ error: "projects must be an array" });
+    return;
+  }
+
+  const [portfolio] = await db.select().from(portfoliosTable).where(eq(portfoliosTable.id, portfolioId));
+  if (!portfolio || portfolio.studentId !== userId) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const existingLinks = await db
+    .select({ projectId: portfolioProjectsTable.projectId })
+    .from(portfolioProjectsTable)
+    .where(eq(portfolioProjectsTable.portfolioId, portfolioId));
+  const existingProjectIds = new Set(existingLinks.map((link) => link.projectId));
+
+  for (const item of projects) {
+    if (!item || typeof item.projectId !== "number") {
+      res.status(400).json({ error: "Each project update must include projectId" });
+      return;
+    }
+    if (!existingProjectIds.has(item.projectId)) {
+      res.status(400).json({ error: "Project does not belong to portfolio" });
+      return;
+    }
+  }
+
+  await db.transaction(async (tx) => {
+    for (const item of projects) {
+      await tx
+        .update(portfolioProjectsTable)
+        .set({
+          displayOrder: typeof item.displayOrder === "number" ? item.displayOrder : 0,
+          isFeatured: typeof item.isFeatured === "boolean" ? item.isFeatured : false,
+        })
+        .where(and(eq(portfolioProjectsTable.portfolioId, portfolioId), eq(portfolioProjectsTable.projectId, item.projectId)));
+    }
   });
 
-  const projectTechByUser = new Map<number, string[]>();
-  const projectCountByUser = new Map<number, number>();
-  projectRows.forEach((row) => {
-    const existing = projectTechByUser.get(row.userId) ?? [];
-    existing.push(...(row.technologies || []));
-    projectTechByUser.set(row.userId, existing);
-    projectCountByUser.set(row.userId, (projectCountByUser.get(row.userId) ?? 0) + 1);
-  });
+  const rows = await getPortfolioRows(eq(portfoliosTable.id, portfolioId));
+  const response = buildPortfolioResponse(rows as PortfolioRow[]);
+  res.json(response);
+});
 
-  const items = shares.map((share) => {
-    const userSkills = skillsByUser.get(share.userId) ?? [];
-    const projectTechs = projectTechByUser.get(share.userId) ?? [];
-    const profileSkills = share.profileSkills || [];
-    const allSkills = Array.from(new Set([
-      ...userSkills.map((skill) => skill.name),
-      ...projectTechs,
-      ...profileSkills,
-    ])).filter(Boolean);
+router.post("/portfolios/:id/publish", requireAuth, async (req, res): Promise<void> => {
+  const userId = await getUserId((req as any).clerkUserId);
+  if (!userId) {
+    res.status(404).json({ error: "Portfolio not found" });
+    return;
+  }
 
-    const normalizedSkillSet = new Set(allSkills.map((skill) => normalizeSkillName(skill)));
-    const matchCount = skillsFilter.length === 0
-      ? 0
-      : skillsFilter.filter((skill) => normalizedSkillSet.has(skill)).length;
+  const portfolioId = parseInt(req.params.id);
+  if (isNaN(portfolioId)) {
+    res.status(400).json({ error: "Invalid portfolio ID" });
+    return;
+  }
 
-    const techStackSummary = buildTechStackSummary(projectTechs).slice(0, 6);
+  const { visibility } = req.body || {};
+  if (!isVisibility(visibility)) {
+    res.status(400).json({ error: "Invalid visibility" });
+    return;
+  }
+
+  const [portfolio] = await db.select().from(portfoliosTable).where(eq(portfoliosTable.id, portfolioId));
+  if (!portfolio || portfolio.studentId !== userId) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  await db
+    .update(portfoliosTable)
+    .set({ visibility, publishedAt: new Date() })
+    .where(eq(portfoliosTable.id, portfolioId));
+
+  const portfolioUrl = `/portfolio/${portfolio.slug}`;
+  const shareLink = `/portfolio/private/${portfolio.shareToken}`;
+
+  res.json({ portfolioUrl: visibility === "public" ? portfolioUrl : null, shareLink });
+});
+
+router.get("/portfolios/public", async (req, res): Promise<void> => {
+  const techParam = typeof req.query.tech === "string" ? req.query.tech : "";
+  const selectedTechs = techParam
+    .split(",")
+    .map((tech) => tech.trim())
+    .filter(Boolean);
+  const sortParam = typeof req.query.sort === "string" ? req.query.sort : "newest";
+
+  const rows = await db
+    .select({
+      portfolioId: portfoliosTable.id,
+      studentId: portfoliosTable.studentId,
+      title: portfoliosTable.title,
+      bio: portfoliosTable.bio,
+      avatarUrl: portfoliosTable.avatarUrl,
+      theme: portfoliosTable.theme,
+      visibility: portfoliosTable.visibility,
+      slug: portfoliosTable.slug,
+      shareToken: portfoliosTable.shareToken,
+      publishedAt: portfoliosTable.publishedAt,
+      createdAt: portfoliosTable.createdAt,
+      updatedAt: portfoliosTable.updatedAt,
+      studentName: usersTable.name,
+      studentEmail: usersTable.email,
+      studentAvatarUrl: usersTable.profilePhotoUrl,
+      projectId: projectsTable.id,
+      projectTitle: projectsTable.title,
+      projectDescription: projectsTable.description,
+      projectTechnologies: projectsTable.technologies,
+      projectDifficulty: projectsTable.difficultyLevel,
+      projectCompletion: projectsTable.completionStatus,
+      projectGithub: projectsTable.githubLink,
+      projectLive: projectsTable.liveLink,
+      projectScreenshot: projectsTable.screenshotUrl,
+      projectDuration: projectsTable.duration,
+      projectRole: projectsTable.role,
+      projectCategory: projectsTable.category,
+      projectCreatedAt: projectsTable.createdAt,
+      projectUpdatedAt: projectsTable.updatedAt,
+      displayOrder: portfolioProjectsTable.displayOrder,
+      isFeatured: portfolioProjectsTable.isFeatured,
+    })
+    .from(portfoliosTable)
+    .innerJoin(usersTable, eq(usersTable.id, portfoliosTable.studentId))
+    .leftJoin(portfolioProjectsTable, eq(portfolioProjectsTable.portfolioId, portfoliosTable.id))
+    .leftJoin(projectsTable, eq(projectsTable.id, portfolioProjectsTable.projectId))
+    .where(and(eq(portfoliosTable.visibility, "public"), sql`${portfoliosTable.publishedAt} is not null`));
+
+  const grouped = new Map<number, PortfolioRow[]>();
+  for (const row of rows as PortfolioRow[]) {
+    if (!grouped.has(row.portfolioId)) {
+      grouped.set(row.portfolioId, []);
+    }
+    grouped.get(row.portfolioId)?.push(row);
+  }
+
+  const summaries = Array.from(grouped.values()).map((portfolioRows) => {
+    const portfolio = buildPortfolioResponse(portfolioRows);
+    if (!portfolio) return null;
+
+    const techScoreMap = new Map(
+      portfolio.techScores.map((score) => [score.technology.toLowerCase(), score.comfortScore]),
+    );
+    const missingTechCount = selectedTechs.reduce((count, tech) => {
+      return techScoreMap.has(tech.toLowerCase()) ? count : count + 1;
+    }, 0);
+    const combinedTechScore = selectedTechs.reduce((sum, tech) => {
+      return sum + (techScoreMap.get(tech.toLowerCase()) || 0);
+    }, 0);
 
     return {
-      shareId: share.shareId,
-      visibility: share.visibility,
-      projectCount: projectCountByUser.get(share.userId) ?? 0,
-      matchCount,
-      topTechnologies: techStackSummary,
-      skills: allSkills,
-      user: {
-        name: share.name,
-        college: share.college,
-        degree: share.degree,
-        graduationYear: share.graduationYear,
-        preferredDomain: share.preferredDomain,
-        profilePhotoUrl: share.profilePhotoUrl,
-      },
-      updatedAt: share.updatedAt,
+      id: portfolio.id,
+      title: portfolio.title,
+      bio: portfolio.bio,
+      avatarUrl: portfolio.avatarUrl,
+      slug: portfolio.slug,
+      theme: portfolio.theme,
+      publishedAt: portfolio.publishedAt,
+      student: portfolio.student,
+      projectsCount: portfolio.projectsCount,
+      topTechs: portfolio.topTechs,
+      techScores: portfolio.techScores,
+      combinedTechScore: selectedTechs.length > 0 ? combinedTechScore : null,
+      missingTechCount,
+      portfolioRating: computePortfolioRating(portfolio.projects),
     };
+  }).filter(Boolean) as Array<any>;
+
+  const sortByNewest = (a: any, b: any) => (b.publishedAt?.getTime?.() || 0) - (a.publishedAt?.getTime?.() || 0);
+  const sortByProjects = (a: any, b: any) => b.projectsCount - a.projectsCount;
+  const sortByRating = (a: any, b: any) => b.portfolioRating - a.portfolioRating;
+
+  const secondarySort = sortParam === "most_projects"
+    ? sortByProjects
+    : sortParam === "top_rated"
+    ? sortByRating
+    : sortByNewest;
+
+  const sorted = summaries.sort((a, b) => {
+    if (selectedTechs.length > 0) {
+      if (a.missingTechCount !== b.missingTechCount) return a.missingTechCount - b.missingTechCount;
+      if (a.combinedTechScore !== b.combinedTechScore) return b.combinedTechScore - a.combinedTechScore;
+      return secondarySort(a, b);
+    }
+    return secondarySort(a, b);
   });
 
-  const filtered = skillsFilter.length > 0
-    ? items.filter((item) => item.matchCount > 0)
-    : items;
-
-  filtered.sort((a, b) => b.matchCount - a.matchCount || a.user.name.localeCompare(b.user.name));
-
-  res.json(filtered);
+  res.json(sorted);
 });
 
-router.get("/portfolio/public/skills", async (_req, res): Promise<void> => {
-  const shares = await db.select({
-    userId: portfolioSharesTable.userId,
-    profileSkills: usersTable.skills,
-  })
-    .from(portfolioSharesTable)
-    .innerJoin(usersTable, eq(portfolioSharesTable.userId, usersTable.id))
-    .where(eq(portfolioSharesTable.visibility, "public"));
-
-  if (shares.length === 0) {
-    res.json([]);
+router.get("/p/:slug", async (req, res): Promise<void> => {
+  const { slug } = req.params;
+  const rows = await getPortfolioRows(and(eq(portfoliosTable.slug, slug), eq(portfoliosTable.visibility, "public"), sql`${portfoliosTable.publishedAt} is not null`));
+  const response = buildPortfolioResponse(rows as PortfolioRow[]);
+  if (!response) {
+    res.status(404).json({ error: "Portfolio not found" });
     return;
   }
+  const { shareToken: _shareToken, ...publicResponse } = response;
+  res.json(publicResponse);
+});
 
-  const userIds = shares.map((share) => share.userId);
-  const [skillRows, projectRows] = await Promise.all([
-    db.select({
-      userId: userSkillsTable.userId,
-      name: userSkillsTable.name,
-    }).from(userSkillsTable).where(inArray(userSkillsTable.userId, userIds)),
-    db.select({
-      userId: projectsTable.userId,
-      technologies: projectsTable.technologies,
-    })
-      .from(projectsTable)
-      .where(and(
-        inArray(projectsTable.userId, userIds),
-        eq(projectsTable.completionStatus, "completed"),
-      )),
-  ]);
-
-  const skillSet = new Set<string>();
-  shares.forEach((share) => {
-    (share.profileSkills || []).forEach((skill) => {
-      if (skill?.trim()) skillSet.add(skill.trim());
-    });
-  });
-  skillRows.forEach((row) => {
-    if (row.name?.trim()) skillSet.add(row.name.trim());
-  });
-  projectRows.forEach((row) => {
-    (row.technologies || []).forEach((tech) => {
-      if (tech?.trim()) skillSet.add(tech.trim());
-    });
-  });
-
-  const skills = Array.from(skillSet).sort((a, b) => a.localeCompare(b));
-  res.json(skills);
+router.get("/p/private/:token", async (req, res): Promise<void> => {
+  const { token } = req.params;
+  const rows = await getPortfolioRows(eq(portfoliosTable.shareToken, token));
+  const response = buildPortfolioResponse(rows as PortfolioRow[]);
+  if (!response) {
+    res.status(404).json({ error: "Portfolio not found" });
+    return;
+  }
+  res.json(response);
 });
 
 export default router;

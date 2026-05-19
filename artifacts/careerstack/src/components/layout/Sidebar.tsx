@@ -7,11 +7,11 @@ import {
   Map, 
   Search, 
   User as UserIcon,
-  Users,
   LogOut,
   TrendingUp,
   Shield,
-  Terminal
+  Terminal,
+  Users
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -43,7 +43,7 @@ export function Sidebar() {
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
             <span className="text-primary-foreground font-bold text-xl">V</span>
           </div>
-          <span className="text-xl font-bold tracking-tight text-foreground">VertX</span>
+          <span className="text-xl font-bold tracking-tight text-foreground">MyProjectory</span>
         </div>
 
         <nav className="flex-1 space-y-2">

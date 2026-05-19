@@ -36,84 +36,75 @@ export interface ProjectStackTag {
   technology: string;
 }
 
-export interface PortfolioShare {
-  id: number;
-  userId: number;
-  shareId: string;
-  visibility: "public" | "private";
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface PortfolioSkillSummary {
-  name: string;
-  proficiencyLevel: string;
-}
-
-export interface PortfolioTechSummary {
-  name: string;
+export interface TechScore {
+  technology: string;
   projectCount: number;
+  comfortScore: number;
+  confidenceLevel: "low" | "medium" | "high";
 }
 
-export interface PortfolioProject {
+export interface PortfolioProjectItem {
   id: number;
-  userId: number;
   title: string;
-  description: string | null;
-  problemSolved: string | null;
+  description?: string | null;
   technologies: string[];
   difficultyLevel: string;
-  githubLink: string | null;
-  liveLink: string | null;
-  screenshotUrl: string | null;
-  duration: string | null;
-  role: string | null;
-  category: string | null;
   completionStatus: string;
+  githubLink?: string | null;
+  liveLink?: string | null;
+  screenshotUrl?: string | null;
+  duration?: string | null;
+  role?: string | null;
+  category?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  displayOrder: number;
+  isFeatured: boolean;
+}
+
+export interface PortfolioResponse {
+  id: number;
+  studentId: number;
+  title: string;
+  bio: string | null;
+  avatarUrl: string | null;
+  theme: string;
+  visibility: "public" | "private";
+  slug: string;
+  shareToken?: string;
+  publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
-  completionDate: string;
-}
-
-export interface PortfolioUserInfo {
-  id: number;
-  name: string;
-  college: string | null;
-  degree: string | null;
-  graduationYear: number | null;
-  preferredDomain: string | null;
-  profilePhotoUrl: string | null;
-  skills: string[];
-}
-
-export interface GeneratedPortfolio {
-  user: PortfolioUserInfo;
-  projects: PortfolioProject[];
-  skills: PortfolioSkillSummary[];
-  techStackSummary: PortfolioTechSummary[];
-  generatedAt: string;
-  share?: {
-    shareId: string;
-    visibility: "public" | "private";
+  student: {
+    id: number;
+    name: string;
+    email: string;
+    avatarUrl: string | null;
   };
+  projects: PortfolioProjectItem[];
+  projectsCount: number;
+  techScores: TechScore[];
+  topTechs: string[];
 }
 
 export interface PublicPortfolioSummary {
-  shareId: string;
-  visibility: "public" | "private";
-  projectCount: number;
-  matchCount: number;
-  topTechnologies: PortfolioTechSummary[];
-  skills: string[];
-  user: {
+  id: number;
+  title: string;
+  bio: string | null;
+  avatarUrl: string | null;
+  slug: string;
+  theme: string;
+  publishedAt: string | null;
+  student: {
+    id: number;
     name: string;
-    college: string | null;
-    degree: string | null;
-    graduationYear: number | null;
-    preferredDomain: string | null;
-    profilePhotoUrl: string | null;
+    email: string;
+    avatarUrl: string | null;
   };
-  updatedAt: string;
+  projectsCount: number;
+  topTechs: string[];
+  techScores: TechScore[];
+  combinedTechScore: number | null;
 }
 
 export interface AddSkillBody {
@@ -190,11 +181,10 @@ export const portfolioKeys = {
   skills: () => ["/api/portfolio/skills"] as const,
   certifications: () => ["/api/portfolio/certifications"] as const,
   projectStackTags: (projectId: number) => ["/api/portfolio/projects", projectId, "stack-tags"] as const,
-  share: () => ["/api/portfolio/share"] as const,
-  generate: () => ["/api/portfolio/generate"] as const,
-  sharePortfolio: (shareId: string) => ["/api/portfolio/share", shareId] as const,
-  publicPortfolios: (skills: string[]) => ["/api/portfolio/public", skills.slice().sort().join(",")] as const,
-  publicSkills: () => ["/api/portfolio/public/skills"] as const,
+  myPortfolio: () => ["/api/portfolios/my"] as const,
+  publicPortfolios: (query: string) => ["/api/portfolios/public", query] as const,
+  publicPortfolioSlug: (slug: string) => ["/api/p", slug] as const,
+  publicPortfolioToken: (token: string) => ["/api/p/private", token] as const,
 };
 
 // ─── Skills Hooks ─────────────────────────────────────────────────────────────
@@ -327,67 +317,117 @@ export function useRemoveProjectStackTag() {
   });
 }
 
-// ─── Portfolio Generation & Sharing Hooks ───────────────────────────────────
+// ─── Portfolio Generation & Publishing ──────────────────────────────────────
 
-export function useGeneratePortfolio(options?: { query?: Partial<UseQueryOptions<GeneratedPortfolio>> }) {
-  const apiFetch = useAuthedFetch();
-  return useQuery<GeneratedPortfolio>({
-    queryKey: portfolioKeys.generate(),
-    queryFn: () => apiFetch<GeneratedPortfolio>("/api/portfolio/generate"),
-    ...options?.query,
-  });
-}
-
-export function useGetPortfolioShare(options?: { query?: Partial<UseQueryOptions<PortfolioShare | null>> }) {
-  const apiFetch = useAuthedFetch();
-  return useQuery<PortfolioShare | null>({
-    queryKey: portfolioKeys.share(),
-    queryFn: () => apiFetch<PortfolioShare | null>("/api/portfolio/share"),
-    ...options?.query,
-  });
-}
-
-export function useUpsertPortfolioShare() {
+export function useGeneratePortfolio() {
   const queryClient = useQueryClient();
   const apiFetch = useAuthedFetch();
-  return useMutation<PortfolioShare, Error, { visibility: "public" | "private" }>({
-    mutationKey: ["upsertPortfolioShare"],
-    mutationFn: (body) =>
-      apiFetch<PortfolioShare>("/api/portfolio/share", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }),
+  return useMutation<PortfolioResponse, Error>({
+    mutationKey: ["generatePortfolio"],
+    mutationFn: () => apiFetch<PortfolioResponse>("/api/portfolios/generate", { method: "POST" }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: portfolioKeys.share() });
-      queryClient.invalidateQueries({ queryKey: ["/api/portfolio/public"], exact: false });
-      queryClient.invalidateQueries({ queryKey: portfolioKeys.publicSkills() });
+      queryClient.invalidateQueries({ queryKey: portfolioKeys.myPortfolio() });
     },
   });
 }
 
-export function useGetSharedPortfolio(shareId: string) {
-  const publicFetch = usePublicFetch();
-  return useQuery<GeneratedPortfolio>({
-    queryKey: portfolioKeys.sharePortfolio(shareId),
-    queryFn: () => publicFetch<GeneratedPortfolio>(`/api/portfolio/share/${shareId}`),
-    enabled: !!shareId,
+export function useMyPortfolio(options?: { query?: Partial<UseQueryOptions<PortfolioResponse | null>> }) {
+  const apiFetch = useAuthedFetch();
+  return useQuery<PortfolioResponse | null>({
+    queryKey: portfolioKeys.myPortfolio(),
+    queryFn: async () => {
+      try {
+        return await apiFetch<PortfolioResponse>("/api/portfolios/my");
+      } catch (err) {
+        if ((err as Error).message?.includes("404")) {
+          return null;
+        }
+        throw err;
+      }
+    },
+    ...options?.query,
   });
 }
 
-export function useListPublicPortfolios(skills: string[]) {
-  const publicFetch = usePublicFetch();
-  const skillQuery = skills.length > 0 ? `?skills=${encodeURIComponent(skills.join(","))}` : "";
+export function useUpdatePortfolio() {
+  const queryClient = useQueryClient();
+  const apiFetch = useAuthedFetch();
+  return useMutation<PortfolioResponse, Error, { id: number; data: Partial<Pick<PortfolioResponse, "title" | "bio" | "visibility" | "theme">> }>({
+    mutationKey: ["updatePortfolio"],
+    mutationFn: ({ id, data }) =>
+      apiFetch<PortfolioResponse>(`/api/portfolios/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: portfolioKeys.myPortfolio() });
+    },
+  });
+}
+
+export function useUpdatePortfolioProjects() {
+  const queryClient = useQueryClient();
+  const apiFetch = useAuthedFetch();
+  return useMutation<PortfolioResponse, Error, { id: number; projects: Array<{ projectId: number; displayOrder: number; isFeatured: boolean }> }>({
+    mutationKey: ["updatePortfolioProjects"],
+    mutationFn: ({ id, projects }) =>
+      apiFetch<PortfolioResponse>(`/api/portfolios/${id}/projects`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projects }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: portfolioKeys.myPortfolio() });
+    },
+  });
+}
+
+export function usePublishPortfolio() {
+  const queryClient = useQueryClient();
+  const apiFetch = useAuthedFetch();
+  return useMutation<{ portfolioUrl: string | null; shareLink: string }, Error, { id: number; visibility: "public" | "private" }>({
+    mutationKey: ["publishPortfolio"],
+    mutationFn: ({ id, visibility }) =>
+      apiFetch<{ portfolioUrl: string | null; shareLink: string }>(`/api/portfolios/${id}/publish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visibility }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: portfolioKeys.myPortfolio() });
+    },
+  });
+}
+
+// ─── Public Portfolio Views ─────────────────────────────────────────────────
+
+export function usePublicPortfolios(query: string, options?: { query?: Partial<UseQueryOptions<PublicPortfolioSummary[]>> }) {
+  const apiFetch = usePublicFetch();
+  const queryString = query ? `?${query}` : "";
   return useQuery<PublicPortfolioSummary[]>({
-    queryKey: portfolioKeys.publicPortfolios(skills),
-    queryFn: () => publicFetch<PublicPortfolioSummary[]>(`/api/portfolio/public${skillQuery}`),
+    queryKey: portfolioKeys.publicPortfolios(queryString),
+    queryFn: () => apiFetch<PublicPortfolioSummary[]>(`/api/portfolios/public${queryString}`),
+    ...options?.query,
   });
 }
 
-export function useListPublicPortfolioSkills() {
-  const publicFetch = usePublicFetch();
-  return useQuery<string[]>({
-    queryKey: portfolioKeys.publicSkills(),
-    queryFn: () => publicFetch<string[]>("/api/portfolio/public/skills"),
+export function usePublicPortfolioBySlug(slug: string, options?: { query?: Partial<UseQueryOptions<PortfolioResponse>> }) {
+  const apiFetch = usePublicFetch();
+  return useQuery<PortfolioResponse>({
+    queryKey: portfolioKeys.publicPortfolioSlug(slug),
+    queryFn: () => apiFetch<PortfolioResponse>(`/api/p/${slug}`),
+    enabled: !!slug,
+    ...options?.query,
+  });
+}
+
+export function usePublicPortfolioByToken(token: string, options?: { query?: Partial<UseQueryOptions<PortfolioResponse>> }) {
+  const apiFetch = usePublicFetch();
+  return useQuery<PortfolioResponse>({
+    queryKey: portfolioKeys.publicPortfolioToken(token),
+    queryFn: () => apiFetch<PortfolioResponse>(`/api/p/private/${token}`),
+    enabled: !!token,
+    ...options?.query,
   });
 }

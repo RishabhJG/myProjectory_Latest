@@ -32,7 +32,7 @@ export class ErrorBoundary extends Component<Props, State> {
           <pre style={{ whiteSpace: "pre-wrap", background: "#f8d7da", padding: "10px", border: "1px solid #f5c6cb", borderRadius: "5px" }}>
             {this.state.error?.message}
           </pre>
-          <pre style={{ whiteSpace: "pre-wrap", background: "#f8d7da", padding: "10px", mt: "10px", fontSize: "12px", border: "1px solid #f5c6cb", borderRadius: "5px"  }}>
+          <pre style={{ whiteSpace: "pre-wrap", background: "#f8d7da", padding: "10px", marginTop: "10px", fontSize: "12px", border: "1px solid #f5c6cb", borderRadius: "5px"  }}>
             {this.state.error?.stack}
           </pre>
         </div>

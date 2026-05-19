@@ -161,7 +161,7 @@ export default function PortfolioDetail() {
                       <FormItem>
                         <FormLabel>Project Title</FormLabel>
                         <FormControl>
-                          <Input placeholder="e.g. VertX" {...field} className="glass" />
+                          <Input placeholder="e.g. MyProjectory" {...field} className="glass" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

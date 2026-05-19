@@ -12,7 +12,7 @@ import {
   useUser,
 } from "@clerk/react";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
-import { Switch, Route, Redirect, useLocation, Router as WouterRouter } from "wouter";
+import { Switch, Route, Redirect, useLocation, Router as WouterRouter, useParams } from "wouter";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -20,6 +20,7 @@ import { Spinner } from "@/components/ui/spinner";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import { AppRoutes } from "@/components/layout/AppRoutes";
+import PublicPortfolioPage from "@/pages/public-portfolio";
 
 const queryClient = new QueryClient();
 
@@ -149,6 +150,22 @@ function ProtectedRoute({ component: Component }: { component: any }) {
   );
 }
 
+function PublicPortfolioSlugRoute() {
+  const params = useParams();
+  const slug = params?.slug;
+  const isInternal = slug === "new" || (/^\d+$/.test(slug || ""));
+
+  if (isInternal) {
+    return <ProtectedRoute component={AppRoutes} />;
+  }
+
+  return <PublicPortfolioPage mode="slug" />;
+}
+
+function PublicPortfolioTokenRoute() {
+  return <PublicPortfolioPage mode="token" />;
+}
+
 function AdminProtectedRoute({ component: Component }: { component: any }) {
   const { user } = useUser();
   const isAdmin = user?.publicMetadata?.role === "admin";
@@ -190,10 +207,13 @@ function ClerkProviderWithRoutes() {
               <Route path="/" component={HomeRedirect} />
               <Route path="/sign-in/*?" component={SignInPage} />
               <Route path="/sign-up/*?" component={SignUpPage} />
-              <Route path="/portfolio-share/:shareId" component={AppRoutes} />
+              <Route path="/portfolio-share/:token" component={PublicPortfolioTokenRoute} />
+              <Route path="/portfolio/private/:token" component={PublicPortfolioTokenRoute} />
+              <Route path="/portfolio/:slug" component={PublicPortfolioSlugRoute} />
               <Route path="/dashboard" component={() => <ProtectedRoute component={AppRoutes} />} />
               <Route path="/portfolio" component={() => <ProtectedRoute component={AppRoutes} />} />
               <Route path="/portfolio/:id" component={() => <ProtectedRoute component={AppRoutes} />} />
+              <Route path="/student-portfolios" component={() => <ProtectedRoute component={AppRoutes} />} />
               <Route path="/scores" component={() => <ProtectedRoute component={AppRoutes} />} />
               <Route path="/roadmaps" component={() => <ProtectedRoute component={AppRoutes} />} />
               <Route path="/roadmaps/:id" component={() => <ProtectedRoute component={AppRoutes} />} />

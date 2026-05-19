@@ -3,6 +3,7 @@ import { Switch, Route } from "wouter";
 import Dashboard from "@/pages/dashboard";
 import Portfolio from "@/pages/portfolio/index";
 import PortfolioDetail from "@/pages/portfolio/[id]";
+import StudentPortfolios from "@/pages/student-portfolios";
 import Scores from "@/pages/scores";
 import Roadmaps from "@/pages/roadmaps/index";
 import RoadmapDetail from "@/pages/roadmaps/[id]";
@@ -14,8 +15,6 @@ import StackDetail from "@/pages/stacks/[id]";
 import JobsPage from "@/pages/jobs/index";
 import JobDetailPage from "@/pages/jobs/[id]";
 import MarketIntelligence from "@/pages/market-intelligence";
-import StudentPortfolios from "@/pages/student-portfolios";
-import PortfolioSharePage from "@/pages/portfolio-share";
 import NotFound from "@/pages/not-found";
 
 export function AppRoutes() {
@@ -25,6 +24,7 @@ export function AppRoutes() {
         <Route path="/dashboard" component={Dashboard} />
         <Route path="/portfolio" component={Portfolio} />
         <Route path="/portfolio/:id" component={PortfolioDetail} />
+        <Route path="/student-portfolios" component={StudentPortfolios} />
         <Route path="/scores" component={Scores} />
         <Route path="/roadmaps" component={Roadmaps} />
         <Route path="/roadmaps/:id" component={RoadmapDetail} />
@@ -36,8 +36,6 @@ export function AppRoutes() {
         <Route path="/jobs" component={JobsPage} />
         <Route path="/jobs/:id" component={JobDetailPage} />
         <Route path="/market-intelligence" component={MarketIntelligence} />
-        <Route path="/student-portfolios" component={StudentPortfolios} />
-        <Route path="/portfolio-share/:shareId" component={PortfolioSharePage} />
         <Route component={NotFound} />
       </Switch>
     </AppLayout>
