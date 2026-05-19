@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link, useLocation } from "wouter";
 import {
   Map, Plus, ArrowRight, Loader2, Sparkles, Compass, Info, Layers,
-  CheckCircle, TrendingUp, Zap, BookOpen, Trophy, FlameKindling,
+  CheckCircle, TrendingUp, Zap, BookOpen, Trophy, FlameKindling, Trash2,
 } from "lucide-react";
 import { useState } from "react";
 import { motion } from "framer-motion";
@@ -138,8 +138,7 @@ function TrendingRoadmapCard({
               </div>
             </div>
             <div className="text-right shrink-0">
-              <div className="text-xl font-bold text-primary">{count}</div>
-              <div className="text-xs text-muted-foreground">{percentage}% share</div>
+              <div className="text-xl font-bold text-primary">{percentage}%</div>
             </div>
           </div>
         </CardHeader>
@@ -150,12 +149,10 @@ function TrendingRoadmapCard({
         </CardContent>
         <CardFooter className="pt-0 border-t border-border/50 bg-muted/20 px-5 py-3">
           {existingRoadmapId ? (
-            <Link href={`/roadmaps/${existingRoadmapId}`} className="w-full">
-              <Button variant="outline" size="sm" className="w-full rounded-xl gap-2">
-                <BookOpen className="w-3.5 h-3.5" />
-                View Roadmap
-              </Button>
-            </Link>
+            <Button variant="outline" size="sm" className="w-full rounded-xl gap-2 opacity-80" disabled>
+              <CheckCircle className="w-3.5 h-3.5" />
+              Already There
+            </Button>
           ) : (
             <Button
               size="sm"
@@ -164,7 +161,7 @@ function TrendingRoadmapCard({
               disabled={isGenerating}
             >
               {isGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-              Generate Roadmap
+              ADD TO MY ROADMAP
             </Button>
           )}
         </CardFooter>
@@ -183,6 +180,27 @@ export default function Roadmaps() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const handleDeleteRoadmap = async (id: number, techName: string) => {
+    if (!confirm(`Are you sure you want to delete the roadmap for "${techName}"? This will remove all your progress for this stack.`)) {
+      return;
+    }
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/roadmaps/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to delete roadmap");
+      toast({ title: "Roadmap Deleted", description: `Removed learning path for ${techName}.` });
+      queryClient.invalidateQueries({ queryKey: getListRoadmapsQueryKey() });
+    } catch (err) {
+      toast({ title: "Error", description: "Failed to delete roadmap.", variant: "destructive" });
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const [showConfirm, setShowConfirm] = useState(false);
   const [pendingTech, setPendingTech] = useState("");
@@ -201,6 +219,10 @@ export default function Roadmaps() {
   const handleSubmitForm = (e: React.FormEvent) => {
     e.preventDefault();
     if (!tech.trim()) return;
+    if (roadmapByTech[tech.trim().toLowerCase()]) {
+      toast({ title: "Already There", description: `You already have a roadmap for ${tech.trim()}.`, variant: "default" });
+      return;
+    }
     setPendingTech(tech.trim());
     setShowConfirm(true);
   };
@@ -219,6 +241,10 @@ export default function Roadmaps() {
   };
 
   const handleTrendingGenerate = (techName: string) => {
+    if (roadmapByTech[techName.toLowerCase()]) {
+      toast({ title: "Already There", description: `You already have a roadmap for ${techName}.`, variant: "default" });
+      return;
+    }
     setPendingTech(techName);
     setShowConfirm(true);
   };
@@ -309,14 +335,14 @@ export default function Roadmaps() {
       </Dialog>
 
       {/* ─── Section 1: Trending Skills ──────────────────────────────── */}
-      <div className="space-y-4">
+      <div className="space-y-4" id="trending-roadmaps">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-400/20 to-yellow-400/20 flex items-center justify-center">
             <TrendingUp className="w-5 h-5 text-orange-500" />
           </div>
           <div>
             <h2 className="text-xl font-bold flex items-center gap-2">
-              Trending Skills
+              Trending Roadmaps
               <Badge variant="outline" className="text-xs font-normal text-orange-500 border-orange-400/40 bg-orange-400/5">
                 From Market Intel
               </Badge>
@@ -353,8 +379,45 @@ export default function Roadmaps() {
         )}
       </div>
 
+      {/* ─── Section 1.5: New Roadmaps ───────────────────────────────── */}
+      <div className="space-y-4" id="new-roadmaps">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-400/20 to-cyan-400/20 flex items-center justify-center">
+            <Sparkles className="w-5 h-5 text-blue-500" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              New Roadmaps
+              <Badge variant="outline" className="text-xs font-normal text-blue-500 border-blue-400/40 bg-blue-400/5">
+                Just Added
+              </Badge>
+            </h2>
+            <p className="text-sm text-muted-foreground">Emerging technologies and new learning paths</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {[
+            { name: "Agentic AI", percentage: 98 },
+            { name: "Web3 & Blockchain", percentage: 85 },
+            { name: "Quantum Computing", percentage: 72 }
+          ].map((trend, i) => (
+            <TrendingRoadmapCard
+              key={trend.name}
+              tech={trend.name}
+              rank={i}
+              count={0}
+              percentage={trend.percentage}
+              existingRoadmapId={roadmapByTech[trend.name.toLowerCase()]}
+              onGenerate={handleTrendingGenerate}
+              isGenerating={generateMutation.isPending && pendingTech === trend.name}
+            />
+          ))}
+        </div>
+      </div>
+
       {/* ─── Section 2: My Roadmaps ──────────────────────────────────── */}
-      <div className="space-y-4">
+      <div className="space-y-4" id="my-roadmaps">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
             <Map className="w-5 h-5 text-primary" />
@@ -381,17 +444,31 @@ export default function Roadmaps() {
                         <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 text-primary font-bold text-lg">
                           {roadmap.technology.charAt(0).toUpperCase()}
                         </div>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button type="button" className="p-1.5 rounded-lg hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors">
-                              <Info className="w-4 h-4" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="max-w-[250px] text-sm">
-                            <p className="font-semibold mb-1">Why {roadmap.technology}?</p>
-                            <p className="text-xs">{getStackDescription(roadmap.technology)}</p>
-                          </TooltipContent>
-                        </Tooltip>
+                        <div className="flex gap-1">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button type="button" className="p-1.5 rounded-lg hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors">
+                                <Info className="w-4 h-4" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-[250px] text-sm">
+                              <p className="font-semibold mb-1">Why {roadmap.technology}?</p>
+                              <p className="text-xs">{getStackDescription(roadmap.technology)}</p>
+                            </TooltipContent>
+                          </Tooltip>
+
+                          <button 
+                            type="button" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteRoadmap(roadmap.id, roadmap.technology);
+                            }}
+                            disabled={deletingId === roadmap.id}
+                            className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                          >
+                            {deletingId === roadmap.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                          </button>
+                        </div>
                       </div>
                       <Link href={`/stacks/${roadmap.id}`}>
                         <CardTitle className="text-xl group-hover:text-primary transition-colors cursor-pointer">
@@ -429,9 +506,15 @@ export default function Roadmaps() {
                   <Compass className="w-7 h-7 text-primary/50" />
                 </div>
                 <p className="text-muted-foreground font-medium">No roadmaps yet</p>
-                <p className="text-sm text-muted-foreground/70 mt-1">
-                  Generate your first roadmap above, or start with a trending skill!
+                <p className="text-sm text-muted-foreground/70 mt-1 mb-6">
+                  You haven't selected any roadmaps. Please select one from the Trending or New Roadmaps sections above to get started.
                 </p>
+                <Button 
+                  onClick={() => document.getElementById("trending-roadmaps")?.scrollIntoView({ behavior: "smooth" })}
+                  className="rounded-xl px-6"
+                >
+                  Select a Roadmap
+                </Button>
               </CardContent>
             </Card>
           )}

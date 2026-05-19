@@ -35,7 +35,7 @@ router.get("/dashboard/summary", requireAuth, async (req, res): Promise<void> =>
   const completedProjects = projects.filter(p => p.completionStatus === "completed");
 
   const techCount: Record<string, number> = {};
-  for (const p of projects) {
+  for (const p of completedProjects) {
     for (const t of p.technologies) {
       techCount[t] = (techCount[t] || 0) + 1;
     }
@@ -56,12 +56,12 @@ router.get("/dashboard/summary", requireAuth, async (req, res): Promise<void> =>
   const roadmapProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   const allJobs = await db.select().from(jobsTable);
-  const userSkills = new Set(projects.flatMap(p => p.technologies));
+  const userSkills = new Set(completedProjects.flatMap(p => p.technologies));
   const jobMatches = allJobs.filter(j =>
     j.requiredSkills.some(s => [...userSkills].some(us => us.toLowerCase() === s.toLowerCase()))
   ).length;
 
-  const comfortComponent = Math.min(100, projects.length * 15 + completedProjects.length * 10);
+  const comfortComponent = Math.min(100, completedProjects.length * 15 + completedProjects.length * 10);
   const portfolioComponent = Math.min(100, completedProjects.length * 25);
   const readinessScore = Math.round(comfortComponent * 0.35 + roadmapProgress * 0.25 + portfolioComponent * 0.15);
 

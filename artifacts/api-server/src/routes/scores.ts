@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, sql } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { db, usersTable, projectsTable, jobsTable, roadmapsTable, milestonesTable, tasksTable } from "@workspace/db";
 import {
   GetTechComfortScoresResponse,
@@ -25,7 +25,7 @@ router.get("/scores/tech-comfort", requireAuth, async (req, res): Promise<void> 
     return;
   }
 
-  const projects = await db.select().from(projectsTable).where(eq(projectsTable.userId, userId));
+  const projects = await db.select().from(projectsTable).where(and(eq(projectsTable.userId, userId), eq(projectsTable.completionStatus, "completed")));
 
   const techMap: Record<string, { count: number; complexitySum: number; completedCount: number }> = {};
 
@@ -110,7 +110,7 @@ router.get("/scores/job-readiness", requireAuth, async (req, res): Promise<void>
     return;
   }
 
-  const projects = await db.select().from(projectsTable).where(eq(projectsTable.userId, userId));
+  const projects = await db.select().from(projectsTable).where(and(eq(projectsTable.userId, userId), eq(projectsTable.completionStatus, "completed")));
   const completedProjects = projects.filter(p => p.completionStatus === "completed");
 
   const comfortComponent = Math.min(100, projects.length * 15 + completedProjects.length * 10);
@@ -178,7 +178,7 @@ router.get("/scores/strengths", requireAuth, async (req, res): Promise<void> => 
     return;
   }
 
-  const projects = await db.select().from(projectsTable).where(eq(projectsTable.userId, userId));
+  const projects = await db.select().from(projectsTable).where(and(eq(projectsTable.userId, userId), eq(projectsTable.completionStatus, "completed")));
   
   const techMap: Record<string, number> = {};
   const domainMap: Record<string, number> = {};
@@ -223,7 +223,7 @@ router.get("/scores/trend-alignment", requireAuth, async (req, res): Promise<voi
     return;
   }
 
-  const projects = await db.select().from(projectsTable).where(eq(projectsTable.userId, userId));
+  const projects = await db.select().from(projectsTable).where(and(eq(projectsTable.userId, userId), eq(projectsTable.completionStatus, "completed")));
   const userSkills = new Set(projects.flatMap(p => p.technologies.map(t => t.toLowerCase())));
 
   const allJobs = await db.select().from(jobsTable);

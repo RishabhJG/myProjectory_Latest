@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike } from "drizzle-orm";
+import { eq, and, ilike } from "drizzle-orm";
 import { db, usersTable, projectsTable, jobsTable } from "@workspace/db";
 import {
   ListJobsQueryParams,
@@ -46,7 +46,7 @@ router.get("/jobs/matches", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const projects = await db.select().from(projectsTable).where(eq(projectsTable.userId, userId));
+  const projects = await db.select().from(projectsTable).where(and(eq(projectsTable.userId, userId), eq(projectsTable.completionStatus, "completed")));
   const [user] = await db.select().from(usersTable).where(eq(usersTable.clerkId, (req as any).clerkUserId));
 
   const userSkills = new Set([

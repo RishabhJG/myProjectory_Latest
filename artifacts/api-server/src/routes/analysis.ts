@@ -56,8 +56,8 @@ router.get("/analysis/strength-breakdown", requireAuth, async (req, res): Promis
   const weights = await getUserScoringWeights(userId);
 
   // Projects score
-  const projects = await db.select().from(projectsTable).where(eq(projectsTable.userId, userId));
-  const completedProjects = projects.filter(p => p.completionStatus === "completed");
+  const projects = await db.select().from(projectsTable).where(and(eq(projectsTable.userId, userId), eq(projectsTable.completionStatus, "completed")));
+  const completedProjects = projects;
   const projectsScore = Math.min(100, completedProjects.length * 25);
 
   // Skills score (from user_skills table — S2.4)
@@ -145,7 +145,7 @@ router.get("/analysis/market-alignment", requireAuth, async (req, res): Promise<
   }
 
   // Collect user skills from S2.4 user_skills + project technologies
-  const projects = await db.select().from(projectsTable).where(eq(projectsTable.userId, userId));
+  const projects = await db.select().from(projectsTable).where(and(eq(projectsTable.userId, userId), eq(projectsTable.completionStatus, "completed")));
   const skills = await db.select().from(userSkillsTable).where(eq(userSkillsTable.userId, userId));
 
   const userSkillSet = new Set([

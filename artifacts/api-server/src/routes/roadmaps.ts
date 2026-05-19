@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
-import { db, usersTable, roadmapsTable, milestonesTable, tasksTable, activityTable } from "@workspace/db";
+import { db, usersTable, roadmapsTable, milestonesTable, tasksTable, activityTable, userSkillsTable } from "@workspace/db";
 import {
   GenerateRoadmapBody,
   GetRoadmapParams,
@@ -242,7 +242,121 @@ router.patch("/roadmaps/:roadmapId/tasks/:taskId/toggle", requireAuth, async (re
     });
   }
 
+  // ─── Sync Skill Proficiency based on Roadmap Completion ──────────────────
+  try {
+    const milestones = await db.select().from(milestonesTable)
+      .where(eq(milestonesTable.roadmapId, roadmap.id));
+
+    let totalTasks = 0;
+    let completedTasks = 0;
+    for (const ms of milestones) {
+      const tasks = await db.select().from(tasksTable).where(eq(tasksTable.milestoneId, ms.id));
+      totalTasks += tasks.length;
+      completedTasks += tasks.filter(t => t.completed).length;
+    }
+
+    const progressPercent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+    let skillLevel: "beginner" | "intermediate" | "advanced" | "expert" | null = null;
+    if (progressPercent === 100) {
+      skillLevel = "expert";
+    } else if (progressPercent >= 70) {
+      skillLevel = "advanced";
+    } else if (progressPercent >= 40) {
+      skillLevel = "intermediate";
+    } else if (progressPercent >= 15) {
+      skillLevel = "beginner";
+    }
+
+    const existingSkills = await db.select().from(userSkillsTable)
+      .where(eq(userSkillsTable.userId, userId));
+    
+    const techSkillName = roadmap.technology.trim();
+    const existingSkill = existingSkills.find(s => s.name.toLowerCase() === techSkillName.toLowerCase());
+
+    if (skillLevel) {
+      if (existingSkill) {
+        if (existingSkill.proficiencyLevel !== skillLevel) {
+          await db.update(userSkillsTable)
+            .set({ proficiencyLevel: skillLevel })
+            .where(eq(userSkillsTable.id, existingSkill.id));
+
+          await db.insert(activityTable).values({
+            userId,
+            type: "project_updated",
+            title: `Updated skill level: ${techSkillName}`,
+            description: `Level bumped to ${skillLevel} (${progressPercent}% roadmap completion)`,
+          });
+        }
+      } else {
+        await db.insert(userSkillsTable).values({
+          userId,
+          name: techSkillName,
+          proficiencyLevel: skillLevel,
+        });
+
+        await db.insert(activityTable).values({
+          userId,
+          type: "project_updated",
+          title: `Added skill: ${techSkillName}`,
+          description: `Added as ${skillLevel} due to roadmap progress (${progressPercent}%)`,
+        });
+      }
+    } else {
+      if (existingSkill) {
+        await db.delete(userSkillsTable).where(eq(userSkillsTable.id, existingSkill.id));
+      }
+    }
+  } catch (syncErr) {
+    console.error("Error syncing roadmap completion to user skills:", syncErr);
+  }
+
   res.json(ToggleTaskResponse.parse(updated));
+});
+
+router.delete("/roadmaps/:id", requireAuth, async (req, res): Promise<void> => {
+  try {
+    const userId = await getUserId((req as any).clerkUserId);
+    if (!userId) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      res.status(400).json({ error: "Invalid roadmap ID" });
+      return;
+    }
+
+    const [deleted] = await db.delete(roadmapsTable)
+      .where(and(eq(roadmapsTable.id, id), eq(roadmapsTable.userId, userId)))
+      .returning();
+
+    if (!deleted) {
+      res.status(404).json({ error: "Roadmap not found" });
+      return;
+    }
+
+    // ─── Delete Synced User Skill ───────────────────────────────────────────
+    const techSkillName = deleted.technology.trim();
+    await db.delete(userSkillsTable)
+      .where(and(
+        eq(userSkillsTable.userId, userId),
+        eq(userSkillsTable.name, techSkillName)
+      ));
+
+    await db.insert(activityTable).values({
+      userId,
+      type: "project_updated",
+      title: `Deleted roadmap: ${deleted.technology}`,
+      description: `Removed learning roadmap for ${deleted.technology}`,
+    });
+
+    res.sendStatus(204);
+  } catch (err) {
+    console.error("Error deleting roadmap:", err);
+    res.status(500).json({ error: (err as Error).message });
+  }
 });
 
 export default router;

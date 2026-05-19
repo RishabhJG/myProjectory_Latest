@@ -265,11 +265,10 @@ export default function Portfolio() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button variant={project.isFeatured ? "default" : "outline"} size="sm" onClick={() => toggleFeatured(index)}>
-                        <Star className="w-4 h-4 mr-2" />
+                      <Button variant="outline" size="sm" onClick={() => toggleFeatured(index)}>
+                        <Star className={`w-4 h-4 mr-2 ${project.isFeatured ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground"}`} />
                         {project.isFeatured ? "Featured" : "Feature"}
                       </Button>
-                      {project.isFeatured && <Badge variant="secondary">Highlighted</Badge>}
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">

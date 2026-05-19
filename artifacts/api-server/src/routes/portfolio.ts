@@ -90,9 +90,10 @@ async function generateUniqueSlug(base: string, existingId?: number | null): Pro
 }
 
 function computeTechScores(projects: Array<{ technologies: string[]; difficultyLevel: string; completionStatus: string }>) {
+  const completedProjects = projects.filter(p => p.completionStatus === "completed");
   const techMap: Record<string, { count: number; complexitySum: number; completedCount: number }> = {};
 
-  for (const project of projects) {
+  for (const project of completedProjects) {
     const complexity = project.difficultyLevel === "advanced" ? 3 : project.difficultyLevel === "intermediate" ? 2 : 1;
     const completionScore = project.completionStatus === "completed"
       ? 1
@@ -133,7 +134,8 @@ function computeTechScores(projects: Array<{ technologies: string[]; difficultyL
 }
 
 function computePortfolioRating(projects: Array<{ difficultyLevel: string; completionStatus: string }>) {
-  return projects.reduce((sum, project) => {
+  const completedProjects = projects.filter(p => p.completionStatus === "completed");
+  return completedProjects.reduce((sum, project) => {
     const difficulty = project.difficultyLevel === "advanced" ? 3 : project.difficultyLevel === "intermediate" ? 2 : 1;
     const completion = project.completionStatus === "completed" ? 1 : project.completionStatus === "in_progress" ? 0.5 : 0.2;
     return sum + difficulty * completion;
