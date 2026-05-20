@@ -140,10 +140,13 @@ router.post("/stacks/:id/link-domain", requireAuth, async (req, res): Promise<vo
     return;
   }
 
-  const [map] = await db.insert(stackRoadmapMapTable).values({
+  // MySQL doesn't support .returning() — insert then select by composite key
+  const insertResult = await db.insert(stackRoadmapMapTable).values({
     stackId: domainId,
     roadmapId,
-  }).returning();
+  });
+  const insertId = (insertResult[0] as any).insertId;
+  const [map] = await db.select().from(stackRoadmapMapTable).where(eq(stackRoadmapMapTable.id, insertId));
 
   res.status(201).json(map);
 });
@@ -152,7 +155,8 @@ router.post("/stacks/:id/link-domain", requireAuth, async (req, res): Promise<vo
 // This endpoint provides domain info for the "Why this stack?" tooltip
 
 router.get("/stacks/domain-suggestions", requireAuth, async (req, res): Promise<void> => {
-  const domains = await db.select().from(domainsTable).where(eq(domainsTable.isVisible, true));
+  // tinyint 1 = visible
+  const domains = await db.select().from(domainsTable).where(eq(domainsTable.isVisible, 1));
 
   const domainSuggestions = await Promise.all(domains.map(async (d) => {
     const skills = await db.select().from(domainSkillMapTable).where(eq(domainSkillMapTable.domainId, d.id));

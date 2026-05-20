@@ -1,11 +1,11 @@
 import { Router, type IRouter } from "express";
 import { eq, inArray } from "drizzle-orm";
-import { 
-  db, 
-  domainsTable, 
-  domainCategoriesTable, 
-  domainRoleMapTable, 
-  domainSkillMapTable 
+import {
+  db,
+  domainsTable,
+  domainCategoriesTable,
+  domainRoleMapTable,
+  domainSkillMapTable,
 } from "@workspace/db";
 import { requireAdmin } from "../middlewares/requireAuth";
 import { GetDomainResponse, CreateDomainBody } from "@workspace/api-zod";
@@ -14,14 +14,14 @@ const router: IRouter = Router();
 
 router.get("/domains", async (req, res): Promise<void> => {
   const allDomains = await db.select().from(domainsTable);
-  
+
   if (allDomains.length === 0) {
     res.json([]);
     return;
   }
-  
+
   const domainIds = allDomains.map(d => d.id);
-  
+
   const categories = await db.select().from(domainCategoriesTable).where(inArray(domainCategoriesTable.domainId, domainIds));
   const roles = await db.select().from(domainRoleMapTable).where(inArray(domainRoleMapTable.domainId, domainIds));
   const skills = await db.select().from(domainSkillMapTable).where(inArray(domainSkillMapTable.domainId, domainIds));
@@ -63,20 +63,22 @@ router.get("/domains/:id", async (req, res): Promise<void> => {
 
 router.post("/domains", requireAdmin, async (req, res): Promise<void> => {
   const body = CreateDomainBody.parse(req.body);
-  
-  const [newDomain] = await db.insert(domainsTable).values({
+
+  // MySQL doesn't support .returning() — insert then select by unique name
+  await db.insert(domainsTable).values({
     name: body.name,
     description: body.description,
     priority: body.priority,
     isVisible: body.isVisible,
-  }).returning();
+  });
+  const [newDomain] = await db.select().from(domainsTable).where(eq(domainsTable.name, body.name));
 
   if (body.categories && body.categories.length > 0) {
     await db.insert(domainCategoriesTable).values(
       body.categories.map(name => ({ domainId: newDomain.id, name }))
     );
   }
-  
+
   if (body.roles && body.roles.length > 0) {
     await db.insert(domainRoleMapTable).values(
       body.roles.map(role => ({ domainId: newDomain.id, role }))
@@ -103,20 +105,22 @@ router.patch("/domains/:id", requireAdmin, async (req, res): Promise<void> => {
   const domainId = parseInt(req.params.id);
   const body = CreateDomainBody.parse(req.body);
 
-  const [updatedDomain] = await db.update(domainsTable)
+  // MySQL doesn't support .returning() — update then select
+  const result = await db.update(domainsTable)
     .set({
       name: body.name,
       description: body.description,
       priority: body.priority,
       isVisible: body.isVisible,
     })
-    .where(eq(domainsTable.id, domainId))
-    .returning();
+    .where(eq(domainsTable.id, domainId));
 
-  if (!updatedDomain) {
+  if ((result[0] as any).affectedRows === 0) {
     res.status(404).json({ error: "Domain not found" });
     return;
   }
+
+  const [updatedDomain] = await db.select().from(domainsTable).where(eq(domainsTable.id, domainId));
 
   // Wipe and rebuild relations
   await db.delete(domainCategoriesTable).where(eq(domainCategoriesTable.domainId, domainId));
@@ -128,7 +132,7 @@ router.patch("/domains/:id", requireAdmin, async (req, res): Promise<void> => {
       body.categories.map(name => ({ domainId: domainId, name }))
     );
   }
-  
+
   if (body.roles && body.roles.length > 0) {
     await db.insert(domainRoleMapTable).values(
       body.roles.map(role => ({ domainId: domainId, role }))
@@ -153,10 +157,10 @@ router.patch("/domains/:id", requireAdmin, async (req, res): Promise<void> => {
 
 router.delete("/domains/:id", requireAdmin, async (req, res): Promise<void> => {
   const domainId = parseInt(req.params.id);
-  
+
   // No need to manually wipe child relations since onDelete is set to cascade!
   await db.delete(domainsTable).where(eq(domainsTable.id, domainId));
-  
+
   res.status(204).send();
 });
 

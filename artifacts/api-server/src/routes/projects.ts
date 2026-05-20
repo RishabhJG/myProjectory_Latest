@@ -32,22 +32,26 @@ async function getOrCreateUserId(clerkId: string): Promise<number | null> {
 
   if (isDevMockUser) {
     logger.info({ clerkId }, "Creating development mock user in database...");
-    const [user] = await db.insert(usersTable).values({
+    // MySQL doesn't support .returning() — insert then select
+    await db.insert(usersTable).values({
       clerkId,
       name: clerkId === "mock_admin_id" ? "Admin User" : "Development User",
-      email: `${clerkId}@localhost`
-    }).returning({ id: usersTable.id });
-    logger.info({ clerkId, userId: user?.id }, "Auto-created development user profile");
-    return user?.id ?? null;
+      email: `${clerkId}@localhost`,
+    });
+    const userId = await getUserId(clerkId);
+    logger.info({ clerkId, userId }, "Auto-created development user profile");
+    return userId;
   }
 
   try {
     const clerkUser = await clerkClient.users.getUser(clerkId);
     const name = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || "User";
     const email = clerkUser.emailAddresses[0]?.emailAddress ?? "";
-    const [user] = await db.insert(usersTable).values({ clerkId, name, email }).returning({ id: usersTable.id });
+    // MySQL doesn't support .returning() — insert then select
+    await db.insert(usersTable).values({ clerkId, name, email });
+    const userId = await getUserId(clerkId);
     logger.info({ clerkId }, "Auto-created user profile from Clerk data");
-    return user?.id ?? null;
+    return userId;
   } catch (err) {
     logger.error({ clerkId, err }, "Failed to auto-create user from Clerk data");
     return null;
@@ -81,16 +85,19 @@ router.post("/projects", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const [project] = await db.insert(projectsTable).values({
+  // MySQL doesn't support .returning() — insert then select by userId + title
+  const result = await db.insert(projectsTable).values({
     ...parsed.data,
     userId,
-  }).returning();
+  });
+  const insertId = (result[0] as any).insertId;
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, insertId));
 
   await db.insert(activityTable).values({
     userId,
     type: "project_added",
     title: `Added project: ${project.title}`,
-    description: `New ${parsed.data.difficultyLevel} project with ${parsed.data.technologies.join(", ")}`,
+    description: `New ${parsed.data.difficultyLevel} project with ${(parsed.data.technologies as string[]).join(", ")}`,
   });
 
   res.status(201).json(GetProjectResponse.parse(project));
@@ -135,20 +142,23 @@ router.patch("/projects/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const [project] = await db.update(projectsTable)
+  // MySQL doesn't support .returning() — update then select
+  const result = await db.update(projectsTable)
     .set(parsed.data)
-    .where(and(eq(projectsTable.id, params.data.id), eq(projectsTable.userId, userId)))
-    .returning();
+    .where(and(eq(projectsTable.id, params.data.id), eq(projectsTable.userId, userId)));
 
-  if (!project) {
+  if ((result[0] as any).affectedRows === 0) {
     res.status(404).json({ error: "Project not found" });
     return;
   }
 
+  const [project] = await db.select().from(projectsTable)
+    .where(and(eq(projectsTable.id, params.data.id), eq(projectsTable.userId, userId)));
+
   await db.insert(activityTable).values({
     userId,
     type: "project_updated",
-    title: `Updated project: ${project.title}`,
+    title: `Updated project: ${project!.title}`,
     description: `Project updated`,
   });
 
@@ -167,11 +177,11 @@ router.delete("/projects/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const [project] = await db.delete(projectsTable)
-    .where(and(eq(projectsTable.id, params.data.id), eq(projectsTable.userId, userId)))
-    .returning();
+  // MySQL doesn't support .returning() — check affectedRows
+  const result = await db.delete(projectsTable)
+    .where(and(eq(projectsTable.id, params.data.id), eq(projectsTable.userId, userId)));
 
-  if (!project) {
+  if ((result[0] as any).affectedRows === 0) {
     res.status(404).json({ error: "Project not found" });
     return;
   }

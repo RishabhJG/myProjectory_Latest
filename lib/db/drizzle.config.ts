@@ -18,8 +18,8 @@ if (!process.env.DATABASE_URL) {
 // Export drizzle configuration
 export default defineConfig({
   schema: "./src/schema", // Path to your schema
-  dialect: "postgresql", // Specify database type
+  dialect: "mysql", // MySQL dialect
   dbCredentials: {
-    url: process.env.DATABASE_URL, // Use env variable
+    url: process.env.DATABASE_URL, // Use env variable (mysql://user:pass@host:port/db)
   },
-});
+});

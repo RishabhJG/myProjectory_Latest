@@ -74,6 +74,7 @@
   "dependencies": {
     "@clerk/react": "^6.2.0",
     "html2canvas": "^1.4.1",
-    "jspdf": "^2.5.1"
+    "jspdf": "^2.5.1",
+    "magic-ui": "^0.1.0"
   }
 }

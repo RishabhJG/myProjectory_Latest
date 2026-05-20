@@ -1,15 +1,15 @@
-import { pgTable, text, serial, integer, timestamp } from "drizzle-orm/pg-core";
+import { mysqlTable, varchar, int, timestamp } from "drizzle-orm/mysql-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { usersTable } from "./users";
 
-export const activityTable = pgTable("activity", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
-  type: text("type").notNull(),
-  title: text("title").notNull(),
-  description: text("description").notNull(),
-  timestamp: timestamp("timestamp", { withTimezone: true }).notNull().defaultNow(),
+export const activityTable = mysqlTable("activity", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  type: varchar("type", { length: 255 }).notNull(),
+  title: varchar("title", { length: 512 }).notNull(),
+  description: varchar("description", { length: 1024 }).notNull(),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
 });
 
 export const insertActivitySchema = createInsertSchema(activityTable).omit({ id: true });

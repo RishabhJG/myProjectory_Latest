@@ -1,19 +1,21 @@
-import { pgTable, text, serial, timestamp, boolean, integer } from "drizzle-orm/pg-core";
+import { mysqlTable, varchar, int, timestamp, tinyint, json } from "drizzle-orm/mysql-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const jobListingsTable = pgTable("job_listings", {
-  id: serial("id").primaryKey(),
-  title: text("title").notNull(),
-  company: text("company").notNull(),
-  location: text("location"),
-  description: text("description"),
-  requiredSkills: text("required_skills").array().notNull().default([]),
-  sourceUrl: text("source_url").notNull().unique(),
-  domain: text("domain"), // e.g. "Software Engineering", "Data Science"
-  postedAt: timestamp("posted_at", { withTimezone: true }),
-  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
-  isActive: boolean("is_active").notNull().default(true),
+export const jobListingsTable = mysqlTable("job_listings", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 512 }).notNull(),
+  company: varchar("company", { length: 255 }).notNull(),
+  location: varchar("location", { length: 255 }),
+  description: varchar("description", { length: 4096 }),
+  // MySQL has no native array type — stored as JSON
+  requiredSkills: json("required_skills").$type<string[]>().notNull().default([]),
+  // UNIQUE URL: MySQL utf8mb4 allows max 768 chars for indexed varchar (768*4=3072 bytes)
+  sourceUrl: varchar("source_url", { length: 768 }).notNull().unique(),
+  domain: varchar("domain", { length: 255 }), // e.g. "Software Engineering", "Data Science"
+  postedAt: timestamp("posted_at"),
+  fetchedAt: timestamp("fetched_at").notNull().defaultNow(),
+  isActive: tinyint("is_active").notNull().default(1),
 });
 
 export const insertJobListingSchema = createInsertSchema(jobListingsTable).omit({ id: true });

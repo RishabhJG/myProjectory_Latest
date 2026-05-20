@@ -1,21 +1,22 @@
-import { drizzle } from "drizzle-orm/node-postgres"; // Drizzle ORM connector
-import pg from "pg"; // PostgreSQL driver
+import { drizzle } from "drizzle-orm/mysql2"; // Drizzle ORM MySQL connector
+import mysql from "mysql2/promise"; // MySQL2 promise-based driver
 import * as schema from "./schema"; // IMPORTANT: point to schema folder
-
-const { Pool } = pg;
 
 // Ensure DATABASE_URL exists
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL must be set.");
 }
 
-// Create PostgreSQL connection pool
-export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+// Create MySQL connection pool
+export const pool = mysql.createPool({
+  uri: process.env.DATABASE_URL,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
 });
 
 // Initialize Drizzle with schema
-export const db = drizzle(pool, { schema });
+export const db = drizzle(pool, { schema, mode: "default" });
 
 // Export schema if needed elsewhere
-export * from "./schema";
+export * from "./schema";

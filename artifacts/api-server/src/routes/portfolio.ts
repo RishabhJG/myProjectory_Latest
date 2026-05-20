@@ -36,22 +36,26 @@ async function getOrCreateUserId(clerkId: string): Promise<number | null> {
 
   if (isDevMockUser) {
     logger.info({ clerkId }, "Creating development mock user in database...");
-    const [user] = await db.insert(usersTable).values({
+    // MySQL doesn't support .returning() — insert then select
+    await db.insert(usersTable).values({
       clerkId,
       name: clerkId === "mock_admin_id" ? "Admin User" : "Development User",
-      email: `${clerkId}@localhost`
-    }).returning({ id: usersTable.id });
-    logger.info({ clerkId, userId: user?.id }, "Auto-created development user profile");
-    return user?.id ?? null;
+      email: `${clerkId}@localhost`,
+    });
+    const userId = await getUserId(clerkId);
+    logger.info({ clerkId, userId }, "Auto-created development user profile");
+    return userId;
   }
 
   try {
     const clerkUser = await clerkClient.users.getUser(clerkId);
     const name = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || "User";
     const email = clerkUser.emailAddresses[0]?.emailAddress ?? "";
-    const [user] = await db.insert(usersTable).values({ clerkId, name, email }).returning({ id: usersTable.id });
+    // MySQL doesn't support .returning() — insert then select
+    await db.insert(usersTable).values({ clerkId, name, email });
+    const userId = await getUserId(clerkId);
     logger.info({ clerkId }, "Auto-created user profile from Clerk data");
-    return user?.id ?? null;
+    return userId;
   } catch (err) {
     logger.error({ clerkId, err }, "Failed to auto-create user from Clerk data");
     return null;
@@ -173,7 +177,7 @@ type PortfolioRow = {
   projectCreatedAt: Date | null;
   projectUpdatedAt: Date | null;
   displayOrder: number | null;
-  isFeatured: boolean | null;
+  isFeatured: number | null; // tinyint in MySQL
 };
 
 function buildPortfolioResponse(rows: PortfolioRow[]) {
@@ -197,7 +201,7 @@ function buildPortfolioResponse(rows: PortfolioRow[]) {
       createdAt: row.projectCreatedAt,
       updatedAt: row.projectUpdatedAt,
       displayOrder: row.displayOrder ?? 0,
-      isFeatured: row.isFeatured ?? false,
+      isFeatured: !!row.isFeatured, // Convert tinyint 0/1 to boolean
     }))
     .sort((a, b) => a.displayOrder - b.displayOrder);
 
@@ -300,11 +304,14 @@ router.post("/portfolio/skills", requireAuth, async (req, res): Promise<void> =>
   const validLevels = ["beginner", "intermediate", "advanced", "expert"];
   const level = validLevels.includes(proficiencyLevel) ? proficiencyLevel : "beginner";
 
-  const [skill] = await db.insert(userSkillsTable).values({
+  // MySQL doesn't support .returning() — insert then select
+  const result = await db.insert(userSkillsTable).values({
     userId,
     name: name.trim(),
     proficiencyLevel: level,
-  }).returning();
+  });
+  const insertId = (result[0] as any).insertId;
+  const [skill] = await db.select().from(userSkillsTable).where(eq(userSkillsTable.id, insertId));
 
   await db.insert(activityTable).values({
     userId,
@@ -329,11 +336,11 @@ router.delete("/portfolio/skills/:id", requireAuth, async (req, res): Promise<vo
     return;
   }
 
-  const [deleted] = await db.delete(userSkillsTable)
-    .where(and(eq(userSkillsTable.id, skillId), eq(userSkillsTable.userId, userId)))
-    .returning();
+  // MySQL doesn't support .returning() — use affectedRows
+  const result = await db.delete(userSkillsTable)
+    .where(and(eq(userSkillsTable.id, skillId), eq(userSkillsTable.userId, userId)));
 
-  if (!deleted) {
+  if ((result[0] as any).affectedRows === 0) {
     res.status(404).json({ error: "Skill not found" });
     return;
   }
@@ -370,13 +377,16 @@ router.post("/portfolio/certifications", requireAuth, async (req, res): Promise<
     return;
   }
 
-  const [cert] = await db.insert(userCertificationsTable).values({
+  // MySQL doesn't support .returning() — insert then select
+  const result = await db.insert(userCertificationsTable).values({
     userId,
     name: name.trim(),
     issuingBody: issuingBody.trim(),
     dateObtained: dateObtained || null,
     url: url || null,
-  }).returning();
+  });
+  const insertId = (result[0] as any).insertId;
+  const [cert] = await db.select().from(userCertificationsTable).where(eq(userCertificationsTable.id, insertId));
 
   await db.insert(activityTable).values({
     userId,
@@ -401,11 +411,11 @@ router.delete("/portfolio/certifications/:id", requireAuth, async (req, res): Pr
     return;
   }
 
-  const [deleted] = await db.delete(userCertificationsTable)
-    .where(and(eq(userCertificationsTable.id, certId), eq(userCertificationsTable.userId, userId)))
-    .returning();
+  // MySQL doesn't support .returning() — use affectedRows
+  const result = await db.delete(userCertificationsTable)
+    .where(and(eq(userCertificationsTable.id, certId), eq(userCertificationsTable.userId, userId)));
 
-  if (!deleted) {
+  if ((result[0] as any).affectedRows === 0) {
     res.status(404).json({ error: "Certification not found" });
     return;
   }
@@ -498,10 +508,13 @@ router.post("/portfolio/projects/:id/stack-tags", requireAuth, async (req, res):
     return;
   }
 
-  const [tag] = await db.insert(projectStackTagsTable).values({
+  // MySQL doesn't support .returning() — insert then select
+  const result = await db.insert(projectStackTagsTable).values({
     projectId,
     stackId,
-  }).returning();
+  });
+  const insertId = (result[0] as any).insertId;
+  const [tag] = await db.select().from(projectStackTagsTable).where(eq(projectStackTagsTable.id, insertId));
 
   await db.insert(activityTable).values({
     userId,
@@ -535,14 +548,14 @@ router.delete("/portfolio/projects/:id/stack-tags/:tagId", requireAuth, async (r
     return;
   }
 
-  const [deleted] = await db.delete(projectStackTagsTable)
+  // MySQL doesn't support .returning() — use affectedRows
+  const result = await db.delete(projectStackTagsTable)
     .where(and(
       eq(projectStackTagsTable.id, tagId),
       eq(projectStackTagsTable.projectId, projectId)
-    ))
-    .returning();
+    ));
 
-  if (!deleted) {
+  if ((result[0] as any).affectedRows === 0) {
     res.status(404).json({ error: "Tag not found" });
     return;
   }
@@ -553,388 +566,431 @@ router.delete("/portfolio/projects/:id/stack-tags/:tagId", requireAuth, async (r
 // ─── Portfolios ─────────────────────────────────────────────────────────────
 
 router.post("/portfolios/generate", requireAuth, async (req, res): Promise<void> => {
-  const userId = await getOrCreateUserId((req as any).clerkUserId);
-  if (!userId) {
-    res.status(500).json({ error: "Failed to resolve user account" });
-    return;
-  }
+  try {
+    const userId = await getOrCreateUserId((req as any).clerkUserId);
+    if (!userId) {
+      res.status(500).json({ error: "Failed to resolve user account" });
+      return;
+    }
 
-  const [user] = await db.select({ name: usersTable.name, avatarUrl: usersTable.profilePhotoUrl }).from(usersTable).where(eq(usersTable.id, userId));
-  const projects = await db.select().from(projectsTable).where(eq(projectsTable.userId, userId));
-  const [existingPortfolio] = await db.select().from(portfoliosTable).where(eq(portfoliosTable.studentId, userId));
+    const [user] = await db.select({ name: usersTable.name, avatarUrl: usersTable.profilePhotoUrl }).from(usersTable).where(eq(usersTable.id, userId));
+    const projects = await db.select().from(projectsTable).where(eq(projectsTable.userId, userId));
+    const [existingPortfolio] = await db.select().from(portfoliosTable).where(eq(portfoliosTable.studentId, userId));
 
-  const baseSlug = slugify(`${user?.name || "student"}-portfolio`);
-  const slug = existingPortfolio?.slug || await generateUniqueSlug(baseSlug, existingPortfolio?.id ?? null);
-  const shareToken = existingPortfolio?.shareToken || randomUUID();
+    const baseSlug = slugify(`${user?.name || "student"}-portfolio`);
+    const slug = existingPortfolio?.slug || await generateUniqueSlug(baseSlug, existingPortfolio?.id ?? null);
+    const shareToken = existingPortfolio?.shareToken || randomUUID();
 
-  const portfolio = await db.transaction(async (tx) => {
-    let portfolioId = existingPortfolio?.id ?? null;
+    const portfolio = await db.transaction(async (tx) => {
+      let portfolioId = existingPortfolio?.id ?? null;
 
-    if (!portfolioId) {
-      const [created] = await tx
-        .insert(portfoliosTable)
-        .values({
-          studentId: userId,
-          title: `${user?.name || "Student"}'s Portfolio`,
-          bio: null,
-          avatarUrl: user?.avatarUrl || null,
-          theme: "default",
-          visibility: "private",
-          slug,
-          shareToken,
+      if (!portfolioId) {
+        // MySQL doesn't support .returning() — insert then get insertId
+        const created = await tx
+          .insert(portfoliosTable)
+          .values({
+            studentId: userId,
+            title: `${user?.name || "Student"}'s Portfolio`,
+            bio: null,
+            avatarUrl: user?.avatarUrl || null,
+            theme: "default",
+            visibility: "private",
+            slug,
+            shareToken,
+          });
+        portfolioId = (created[0] as any).insertId ?? null;
+      } else {
+        await tx
+          .update(portfoliosTable)
+          .set({
+            updatedAt: new Date(),
+            avatarUrl: existingPortfolio.avatarUrl || user?.avatarUrl || null,
+            slug,
+            shareToken,
+          })
+          .where(eq(portfoliosTable.id, portfolioId));
+      }
+
+      if (!portfolioId) {
+        return null;
+      }
+
+      const existingLinks = await tx
+        .select({ projectId: portfolioProjectsTable.projectId, displayOrder: portfolioProjectsTable.displayOrder, isFeatured: portfolioProjectsTable.isFeatured })
+        .from(portfolioProjectsTable)
+        .where(eq(portfolioProjectsTable.portfolioId, portfolioId));
+
+      const existingMap = new Map(existingLinks.map((link) => [link.projectId, link]));
+      const orderedProjects = projects
+        .map((project) => {
+          const existing = existingMap.get(project.id);
+          return {
+            projectId: project.id,
+            displayOrder: existing?.displayOrder ?? 9999,
+            isFeatured: existing?.isFeatured ?? 0,
+            createdAt: project.createdAt,
+          };
         })
-        .returning();
-      portfolioId = created?.id ?? null;
-    } else {
-      await tx
-        .update(portfoliosTable)
-        .set({
-          updatedAt: new Date(),
-          avatarUrl: existingPortfolio.avatarUrl || user?.avatarUrl || null,
-          slug,
-          shareToken,
+        .sort((a, b) => {
+          if (a.displayOrder !== b.displayOrder) return a.displayOrder - b.displayOrder;
+          return (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0);
         })
-        .where(eq(portfoliosTable.id, portfolioId));
+        .map((item, index) => ({
+          portfolioId,
+          projectId: item.projectId,
+          displayOrder: index + 1,
+          isFeatured: item.isFeatured,
+        }));
+
+      await tx.delete(portfolioProjectsTable).where(eq(portfolioProjectsTable.portfolioId, portfolioId));
+
+      if (orderedProjects.length > 0) {
+        await tx.insert(portfolioProjectsTable).values(orderedProjects);
+      }
+
+      return portfolioId;
+    });
+
+    if (!portfolio) {
+      res.status(500).json({ error: "Failed to generate portfolio" });
+      return;
     }
 
-    if (!portfolioId) {
-      return null;
-    }
-
-    const existingLinks = await tx
-      .select({ projectId: portfolioProjectsTable.projectId, displayOrder: portfolioProjectsTable.displayOrder, isFeatured: portfolioProjectsTable.isFeatured })
-      .from(portfolioProjectsTable)
-      .where(eq(portfolioProjectsTable.portfolioId, portfolioId));
-
-    const existingMap = new Map(existingLinks.map((link) => [link.projectId, link]));
-    const orderedProjects = projects
-      .map((project) => {
-        const existing = existingMap.get(project.id);
-        return {
-          projectId: project.id,
-          displayOrder: existing?.displayOrder ?? 9999,
-          isFeatured: existing?.isFeatured ?? false,
-          createdAt: project.createdAt,
-        };
-      })
-      .sort((a, b) => {
-        if (a.displayOrder !== b.displayOrder) return a.displayOrder - b.displayOrder;
-        return (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0);
-      })
-      .map((item, index) => ({
-        portfolioId,
-        projectId: item.projectId,
-        displayOrder: index + 1,
-        isFeatured: item.isFeatured,
-      }));
-
-    await tx.delete(portfolioProjectsTable).where(eq(portfolioProjectsTable.portfolioId, portfolioId));
-
-    if (orderedProjects.length > 0) {
-      await tx.insert(portfolioProjectsTable).values(orderedProjects);
-    }
-
-    return portfolioId;
-  });
-
-  if (!portfolio) {
+    const rows = await getPortfolioRows(eq(portfoliosTable.id, portfolio));
+    const response = buildPortfolioResponse(rows as PortfolioRow[]);
+    res.json(response);
+  } catch (err) {
+    logger.error({ err }, "Error generating portfolio");
     res.status(500).json({ error: "Failed to generate portfolio" });
-    return;
   }
-
-  const rows = await getPortfolioRows(eq(portfoliosTable.id, portfolio));
-  const response = buildPortfolioResponse(rows as PortfolioRow[]);
-  res.json(response);
 });
 
 router.get("/portfolios/my", requireAuth, async (req, res): Promise<void> => {
-  const userId = await getUserId((req as any).clerkUserId);
-  if (!userId) {
-    res.status(404).json({ error: "Portfolio not found" });
-    return;
-  }
+  try {
+    const userId = await getUserId((req as any).clerkUserId);
+    if (!userId) {
+      res.status(404).json({ error: "Portfolio not found" });
+      return;
+    }
 
-  const rows = await getPortfolioRows(eq(portfoliosTable.studentId, userId));
-  const response = buildPortfolioResponse(rows as PortfolioRow[]);
-  if (!response) {
-    res.status(404).json({ error: "Portfolio not found" });
-    return;
-  }
+    const rows = await getPortfolioRows(eq(portfoliosTable.studentId, userId));
+    const response = buildPortfolioResponse(rows as PortfolioRow[]);
+    if (!response) {
+      res.status(404).json({ error: "Portfolio not found" });
+      return;
+    }
 
-  res.json(response);
+    res.json(response);
+  } catch (err) {
+    logger.error({ err }, "Error fetching user portfolio");
+    res.status(500).json({ error: "Failed to load portfolio" });
+  }
 });
 
 router.patch("/portfolios/:id", requireAuth, async (req, res): Promise<void> => {
-  const userId = await getUserId((req as any).clerkUserId);
-  if (!userId) {
-    res.status(404).json({ error: "Portfolio not found" });
-    return;
-  }
-
-  const portfolioId = parseInt(req.params.id);
-  if (isNaN(portfolioId)) {
-    res.status(400).json({ error: "Invalid portfolio ID" });
-    return;
-  }
-
-  const [portfolio] = await db.select().from(portfoliosTable).where(eq(portfoliosTable.id, portfolioId));
-  if (!portfolio || portfolio.studentId !== userId) {
-    res.status(403).json({ error: "Forbidden" });
-    return;
-  }
-
-  const { title, bio, visibility, theme } = req.body || {};
-  const update: Partial<typeof portfoliosTable.$inferInsert> = {};
-
-  if (title && typeof title === "string") update.title = title.trim();
-  if (bio !== undefined && (typeof bio === "string" || bio === null)) update.bio = bio ? bio.trim() : null;
-  if (theme && typeof theme === "string") update.theme = theme.trim();
-  if (visibility !== undefined) {
-    if (!isVisibility(visibility)) {
-      res.status(400).json({ error: "Invalid visibility value" });
+  try {
+    const userId = await getUserId((req as any).clerkUserId);
+    if (!userId) {
+      res.status(404).json({ error: "Portfolio not found" });
       return;
     }
-    update.visibility = visibility;
+
+    const portfolioId = parseInt(req.params.id);
+    if (isNaN(portfolioId)) {
+      res.status(400).json({ error: "Invalid portfolio ID" });
+      return;
+    }
+
+    const [portfolio] = await db.select().from(portfoliosTable).where(eq(portfoliosTable.id, portfolioId));
+    if (!portfolio || portfolio.studentId !== userId) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+
+    const { title, bio, visibility, theme } = req.body || {};
+    const update: Partial<typeof portfoliosTable.$inferInsert> = {};
+
+    if (title && typeof title === "string") update.title = title.trim();
+    if (bio !== undefined && (typeof bio === "string" || bio === null)) update.bio = bio ? bio.trim() : null;
+    if (theme && typeof theme === "string") update.theme = theme.trim();
+    if (visibility !== undefined) {
+      if (!isVisibility(visibility)) {
+        res.status(400).json({ error: "Invalid visibility value" });
+        return;
+      }
+      update.visibility = visibility;
+    }
+
+    if (Object.keys(update).length === 0) {
+      res.status(400).json({ error: "No valid fields to update" });
+      return;
+    }
+
+    await db.update(portfoliosTable).set(update).where(eq(portfoliosTable.id, portfolioId));
+
+    const rows = await getPortfolioRows(eq(portfoliosTable.id, portfolioId));
+    const response = buildPortfolioResponse(rows as PortfolioRow[]);
+    res.json(response);
+  } catch (err) {
+    logger.error({ err }, "Error updating portfolio");
+    res.status(500).json({ error: "Failed to update portfolio" });
   }
-
-  if (Object.keys(update).length === 0) {
-    res.status(400).json({ error: "No valid fields to update" });
-    return;
-  }
-
-  await db.update(portfoliosTable).set(update).where(eq(portfoliosTable.id, portfolioId));
-
-  const rows = await getPortfolioRows(eq(portfoliosTable.id, portfolioId));
-  const response = buildPortfolioResponse(rows as PortfolioRow[]);
-  res.json(response);
 });
 
 router.patch("/portfolios/:id/projects", requireAuth, async (req, res): Promise<void> => {
-  const userId = await getUserId((req as any).clerkUserId);
-  if (!userId) {
-    res.status(404).json({ error: "Portfolio not found" });
-    return;
-  }
-
-  const portfolioId = parseInt(req.params.id);
-  if (isNaN(portfolioId)) {
-    res.status(400).json({ error: "Invalid portfolio ID" });
-    return;
-  }
-
-  const { projects } = req.body || {};
-  if (!Array.isArray(projects)) {
-    res.status(400).json({ error: "projects must be an array" });
-    return;
-  }
-
-  const [portfolio] = await db.select().from(portfoliosTable).where(eq(portfoliosTable.id, portfolioId));
-  if (!portfolio || portfolio.studentId !== userId) {
-    res.status(403).json({ error: "Forbidden" });
-    return;
-  }
-
-  const existingLinks = await db
-    .select({ projectId: portfolioProjectsTable.projectId })
-    .from(portfolioProjectsTable)
-    .where(eq(portfolioProjectsTable.portfolioId, portfolioId));
-  const existingProjectIds = new Set(existingLinks.map((link) => link.projectId));
-
-  for (const item of projects) {
-    if (!item || typeof item.projectId !== "number") {
-      res.status(400).json({ error: "Each project update must include projectId" });
+  try {
+    const userId = await getUserId((req as any).clerkUserId);
+    if (!userId) {
+      res.status(404).json({ error: "Portfolio not found" });
       return;
     }
-    if (!existingProjectIds.has(item.projectId)) {
-      res.status(400).json({ error: "Project does not belong to portfolio" });
+
+    const portfolioId = parseInt(req.params.id);
+    if (isNaN(portfolioId)) {
+      res.status(400).json({ error: "Invalid portfolio ID" });
       return;
     }
-  }
 
-  await db.transaction(async (tx) => {
+    const { projects } = req.body || {};
+    if (!Array.isArray(projects)) {
+      res.status(400).json({ error: "projects must be an array" });
+      return;
+    }
+
+    const [portfolio] = await db.select().from(portfoliosTable).where(eq(portfoliosTable.id, portfolioId));
+    if (!portfolio || portfolio.studentId !== userId) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+
+    const existingLinks = await db
+      .select({ projectId: portfolioProjectsTable.projectId })
+      .from(portfolioProjectsTable)
+      .where(eq(portfolioProjectsTable.portfolioId, portfolioId));
+    const existingProjectIds = new Set(existingLinks.map((link) => link.projectId));
+
     for (const item of projects) {
-      await tx
-        .update(portfolioProjectsTable)
-        .set({
-          displayOrder: typeof item.displayOrder === "number" ? item.displayOrder : 0,
-          isFeatured: typeof item.isFeatured === "boolean" ? item.isFeatured : false,
-        })
-        .where(and(eq(portfolioProjectsTable.portfolioId, portfolioId), eq(portfolioProjectsTable.projectId, item.projectId)));
+      if (!item || typeof item.projectId !== "number") {
+        res.status(400).json({ error: "Each project update must include projectId" });
+        return;
+      }
+      if (!existingProjectIds.has(item.projectId)) {
+        res.status(400).json({ error: "Project does not belong to portfolio" });
+        return;
+      }
     }
-  });
 
-  const rows = await getPortfolioRows(eq(portfoliosTable.id, portfolioId));
-  const response = buildPortfolioResponse(rows as PortfolioRow[]);
-  res.json(response);
+    await db.transaction(async (tx) => {
+      for (const item of projects) {
+        await tx
+          .update(portfolioProjectsTable)
+          .set({
+            displayOrder: typeof item.displayOrder === "number" ? item.displayOrder : 0,
+            isFeatured: typeof item.isFeatured === "boolean" ? (item.isFeatured ? 1 : 0) : 0,
+          })
+          .where(and(eq(portfolioProjectsTable.portfolioId, portfolioId), eq(portfolioProjectsTable.projectId, item.projectId)));
+      }
+    });
+
+    const rows = await getPortfolioRows(eq(portfoliosTable.id, portfolioId));
+    const response = buildPortfolioResponse(rows as PortfolioRow[]);
+    res.json(response);
+  } catch (err) {
+    logger.error({ err }, "Error updating portfolio projects");
+    res.status(500).json({ error: "Failed to update portfolio projects" });
+  }
 });
 
 router.post("/portfolios/:id/publish", requireAuth, async (req, res): Promise<void> => {
-  const userId = await getUserId((req as any).clerkUserId);
-  if (!userId) {
-    res.status(404).json({ error: "Portfolio not found" });
-    return;
+  try {
+    const userId = await getUserId((req as any).clerkUserId);
+    if (!userId) {
+      res.status(404).json({ error: "Portfolio not found" });
+      return;
+    }
+
+    const portfolioId = parseInt(req.params.id);
+    if (isNaN(portfolioId)) {
+      res.status(400).json({ error: "Invalid portfolio ID" });
+      return;
+    }
+
+    const { visibility } = req.body || {};
+    if (!isVisibility(visibility)) {
+      res.status(400).json({ error: "Invalid visibility" });
+      return;
+    }
+
+    const [portfolio] = await db.select().from(portfoliosTable).where(eq(portfoliosTable.id, portfolioId));
+    if (!portfolio || portfolio.studentId !== userId) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+
+    await db
+      .update(portfoliosTable)
+      .set({ visibility, publishedAt: new Date() })
+      .where(eq(portfoliosTable.id, portfolioId));
+
+    // Re-fetch the updated portfolio to get the slug and shareToken
+    const [updatedPortfolio] = await db.select().from(portfoliosTable).where(eq(portfoliosTable.id, portfolioId));
+
+    const portfolioUrl = `/portfolio/${updatedPortfolio.slug}`;
+    const shareLink = `/portfolio/private/${updatedPortfolio.shareToken}`;
+
+    res.json({ portfolioUrl: visibility === "public" ? portfolioUrl : null, shareLink });
+  } catch (err) {
+    logger.error({ err }, "Error publishing portfolio");
+    res.status(500).json({ error: "Failed to publish portfolio" });
   }
-
-  const portfolioId = parseInt(req.params.id);
-  if (isNaN(portfolioId)) {
-    res.status(400).json({ error: "Invalid portfolio ID" });
-    return;
-  }
-
-  const { visibility } = req.body || {};
-  if (!isVisibility(visibility)) {
-    res.status(400).json({ error: "Invalid visibility" });
-    return;
-  }
-
-  const [portfolio] = await db.select().from(portfoliosTable).where(eq(portfoliosTable.id, portfolioId));
-  if (!portfolio || portfolio.studentId !== userId) {
-    res.status(403).json({ error: "Forbidden" });
-    return;
-  }
-
-  await db
-    .update(portfoliosTable)
-    .set({ visibility, publishedAt: new Date() })
-    .where(eq(portfoliosTable.id, portfolioId));
-
-  const portfolioUrl = `/portfolio/${portfolio.slug}`;
-  const shareLink = `/portfolio/private/${portfolio.shareToken}`;
-
-  res.json({ portfolioUrl: visibility === "public" ? portfolioUrl : null, shareLink });
 });
 
 router.get("/portfolios/public", async (req, res): Promise<void> => {
-  const techParam = typeof req.query.tech === "string" ? req.query.tech : "";
-  const selectedTechs = techParam
-    .split(",")
-    .map((tech) => tech.trim())
-    .filter(Boolean);
-  const sortParam = typeof req.query.sort === "string" ? req.query.sort : "newest";
+  try {
+    const techParam = typeof req.query.tech === "string" ? req.query.tech : "";
+    const selectedTechs = techParam
+      .split(",")
+      .map((tech) => tech.trim())
+      .filter(Boolean);
+    const sortParam = typeof req.query.sort === "string" ? req.query.sort : "newest";
 
-  const rows = await db
-    .select({
-      portfolioId: portfoliosTable.id,
-      studentId: portfoliosTable.studentId,
-      title: portfoliosTable.title,
-      bio: portfoliosTable.bio,
-      avatarUrl: portfoliosTable.avatarUrl,
-      theme: portfoliosTable.theme,
-      visibility: portfoliosTable.visibility,
-      slug: portfoliosTable.slug,
-      shareToken: portfoliosTable.shareToken,
-      publishedAt: portfoliosTable.publishedAt,
-      createdAt: portfoliosTable.createdAt,
-      updatedAt: portfoliosTable.updatedAt,
-      studentName: usersTable.name,
-      studentEmail: usersTable.email,
-      studentAvatarUrl: usersTable.profilePhotoUrl,
-      projectId: projectsTable.id,
-      projectTitle: projectsTable.title,
-      projectDescription: projectsTable.description,
-      projectTechnologies: projectsTable.technologies,
-      projectDifficulty: projectsTable.difficultyLevel,
-      projectCompletion: projectsTable.completionStatus,
-      projectGithub: projectsTable.githubLink,
-      projectLive: projectsTable.liveLink,
-      projectScreenshot: projectsTable.screenshotUrl,
-      projectDuration: projectsTable.duration,
-      projectRole: projectsTable.role,
-      projectCategory: projectsTable.category,
-      projectCreatedAt: projectsTable.createdAt,
-      projectUpdatedAt: projectsTable.updatedAt,
-      displayOrder: portfolioProjectsTable.displayOrder,
-      isFeatured: portfolioProjectsTable.isFeatured,
-    })
-    .from(portfoliosTable)
-    .innerJoin(usersTable, eq(usersTable.id, portfoliosTable.studentId))
-    .leftJoin(portfolioProjectsTable, eq(portfolioProjectsTable.portfolioId, portfoliosTable.id))
-    .leftJoin(projectsTable, eq(projectsTable.id, portfolioProjectsTable.projectId))
-    .where(and(eq(portfoliosTable.visibility, "public"), sql`${portfoliosTable.publishedAt} is not null`));
+    const rows = await db
+      .select({
+        portfolioId: portfoliosTable.id,
+        studentId: portfoliosTable.studentId,
+        title: portfoliosTable.title,
+        bio: portfoliosTable.bio,
+        avatarUrl: portfoliosTable.avatarUrl,
+        theme: portfoliosTable.theme,
+        visibility: portfoliosTable.visibility,
+        slug: portfoliosTable.slug,
+        shareToken: portfoliosTable.shareToken,
+        publishedAt: portfoliosTable.publishedAt,
+        createdAt: portfoliosTable.createdAt,
+        updatedAt: portfoliosTable.updatedAt,
+        studentName: usersTable.name,
+        studentEmail: usersTable.email,
+        studentAvatarUrl: usersTable.profilePhotoUrl,
+        projectId: projectsTable.id,
+        projectTitle: projectsTable.title,
+        projectDescription: projectsTable.description,
+        projectTechnologies: projectsTable.technologies,
+        projectDifficulty: projectsTable.difficultyLevel,
+        projectCompletion: projectsTable.completionStatus,
+        projectGithub: projectsTable.githubLink,
+        projectLive: projectsTable.liveLink,
+        projectScreenshot: projectsTable.screenshotUrl,
+        projectDuration: projectsTable.duration,
+        projectRole: projectsTable.role,
+        projectCategory: projectsTable.category,
+        projectCreatedAt: projectsTable.createdAt,
+        projectUpdatedAt: projectsTable.updatedAt,
+        displayOrder: portfolioProjectsTable.displayOrder,
+        isFeatured: portfolioProjectsTable.isFeatured,
+      })
+      .from(portfoliosTable)
+      .innerJoin(usersTable, eq(usersTable.id, portfoliosTable.studentId))
+      .leftJoin(portfolioProjectsTable, eq(portfolioProjectsTable.portfolioId, portfoliosTable.id))
+      .leftJoin(projectsTable, eq(projectsTable.id, portfolioProjectsTable.projectId))
+      .where(and(eq(portfoliosTable.visibility, "public"), sql`${portfoliosTable.publishedAt} is not null`));
 
-  const grouped = new Map<number, PortfolioRow[]>();
-  for (const row of rows as PortfolioRow[]) {
-    if (!grouped.has(row.portfolioId)) {
-      grouped.set(row.portfolioId, []);
+    const grouped = new Map<number, PortfolioRow[]>();
+    for (const row of rows as PortfolioRow[]) {
+      if (!grouped.has(row.portfolioId)) {
+        grouped.set(row.portfolioId, []);
+      }
+      grouped.get(row.portfolioId)?.push(row);
     }
-    grouped.get(row.portfolioId)?.push(row);
-  }
 
-  const summaries = Array.from(grouped.values()).map((portfolioRows) => {
-    const portfolio = buildPortfolioResponse(portfolioRows);
-    if (!portfolio) return null;
+    const summaries = Array.from(grouped.values()).map((portfolioRows) => {
+      const portfolio = buildPortfolioResponse(portfolioRows);
+      if (!portfolio) return null;
 
-    const techScoreMap = new Map(
-      portfolio.techScores.map((score) => [score.technology.toLowerCase(), score.comfortScore]),
-    );
-    const missingTechCount = selectedTechs.reduce((count, tech) => {
-      return techScoreMap.has(tech.toLowerCase()) ? count : count + 1;
-    }, 0);
-    const combinedTechScore = selectedTechs.reduce((sum, tech) => {
-      return sum + (techScoreMap.get(tech.toLowerCase()) || 0);
-    }, 0);
+      const techScoreMap = new Map(
+        portfolio.techScores.map((score) => [score.technology.toLowerCase(), score.comfortScore]),
+      );
+      const missingTechCount = selectedTechs.reduce((count, tech) => {
+        return techScoreMap.has(tech.toLowerCase()) ? count : count + 1;
+      }, 0);
+      const combinedTechScore = selectedTechs.reduce((sum, tech) => {
+        return sum + (techScoreMap.get(tech.toLowerCase()) || 0);
+      }, 0);
 
-    return {
-      id: portfolio.id,
-      title: portfolio.title,
-      bio: portfolio.bio,
-      avatarUrl: portfolio.avatarUrl,
-      slug: portfolio.slug,
-      theme: portfolio.theme,
-      publishedAt: portfolio.publishedAt,
-      student: portfolio.student,
-      projectsCount: portfolio.projectsCount,
-      topTechs: portfolio.topTechs,
-      techScores: portfolio.techScores,
-      combinedTechScore: selectedTechs.length > 0 ? combinedTechScore : null,
-      missingTechCount,
-      portfolioRating: computePortfolioRating(portfolio.projects),
-    };
-  }).filter(Boolean) as Array<any>;
+      return {
+        id: portfolio.id,
+        title: portfolio.title,
+        bio: portfolio.bio,
+        avatarUrl: portfolio.avatarUrl,
+        slug: portfolio.slug,
+        theme: portfolio.theme,
+        publishedAt: portfolio.publishedAt,
+        student: portfolio.student,
+        projectsCount: portfolio.projectsCount,
+        topTechs: portfolio.topTechs,
+        techScores: portfolio.techScores,
+        combinedTechScore: selectedTechs.length > 0 ? combinedTechScore : null,
+        missingTechCount,
+        portfolioRating: computePortfolioRating(portfolio.projects),
+      };
+    }).filter(Boolean) as Array<any>;
 
-  const sortByNewest = (a: any, b: any) => (b.publishedAt?.getTime?.() || 0) - (a.publishedAt?.getTime?.() || 0);
-  const sortByProjects = (a: any, b: any) => b.projectsCount - a.projectsCount;
-  const sortByRating = (a: any, b: any) => b.portfolioRating - a.portfolioRating;
+    const sortByNewest = (a: any, b: any) => (b.publishedAt?.getTime?.() || 0) - (a.publishedAt?.getTime?.() || 0);
+    const sortByProjects = (a: any, b: any) => b.projectsCount - a.projectsCount;
+    const sortByRating = (a: any, b: any) => b.portfolioRating - a.portfolioRating;
 
-  const secondarySort = sortParam === "most_projects"
-    ? sortByProjects
-    : sortParam === "top_rated"
-    ? sortByRating
-    : sortByNewest;
+    const secondarySort = sortParam === "most_projects"
+      ? sortByProjects
+      : sortParam === "top_rated"
+      ? sortByRating
+      : sortByNewest;
 
-  const sorted = summaries.sort((a, b) => {
-    if (selectedTechs.length > 0) {
-      if (a.missingTechCount !== b.missingTechCount) return a.missingTechCount - b.missingTechCount;
-      if (a.combinedTechScore !== b.combinedTechScore) return b.combinedTechScore - a.combinedTechScore;
+    const sorted = summaries.sort((a, b) => {
+      if (selectedTechs.length > 0) {
+        if (a.missingTechCount !== b.missingTechCount) return a.missingTechCount - b.missingTechCount;
+        if (a.combinedTechScore !== b.combinedTechScore) return b.combinedTechScore - a.combinedTechScore;
+        return secondarySort(a, b);
+      }
       return secondarySort(a, b);
-    }
-    return secondarySort(a, b);
-  });
+    });
 
-  res.json(sorted);
+    res.json(sorted);
+  } catch (err) {
+    logger.error({ err }, "Error fetching public portfolios");
+    res.status(500).json({ error: "Failed to fetch public portfolios" });
+  }
 });
 
 router.get("/p/:slug", async (req, res): Promise<void> => {
-  const { slug } = req.params;
-  const rows = await getPortfolioRows(and(eq(portfoliosTable.slug, slug), eq(portfoliosTable.visibility, "public"), sql`${portfoliosTable.publishedAt} is not null`));
-  const response = buildPortfolioResponse(rows as PortfolioRow[]);
-  if (!response) {
-    res.status(404).json({ error: "Portfolio not found" });
-    return;
+  try {
+    const { slug } = req.params;
+    const rows = await getPortfolioRows(and(eq(portfoliosTable.slug, slug), eq(portfoliosTable.visibility, "public"), sql`${portfoliosTable.publishedAt} is not null`));
+    const response = buildPortfolioResponse(rows as PortfolioRow[]);
+    if (!response) {
+      res.status(404).json({ error: "Portfolio not found" });
+      return;
+    }
+    const { shareToken: _shareToken, ...publicResponse } = response;
+    res.json(publicResponse);
+  } catch (err) {
+    logger.error({ err }, "Error fetching portfolio by slug");
+    res.status(500).json({ error: "Failed to fetch portfolio" });
   }
-  const { shareToken: _shareToken, ...publicResponse } = response;
-  res.json(publicResponse);
 });
 
 router.get("/p/private/:token", async (req, res): Promise<void> => {
-  const { token } = req.params;
-  const rows = await getPortfolioRows(eq(portfoliosTable.shareToken, token));
-  const response = buildPortfolioResponse(rows as PortfolioRow[]);
-  if (!response) {
-    res.status(404).json({ error: "Portfolio not found" });
-    return;
+  try {
+    const { token } = req.params;
+    const rows = await getPortfolioRows(eq(portfoliosTable.shareToken, token));
+    const response = buildPortfolioResponse(rows as PortfolioRow[]);
+    if (!response) {
+      res.status(404).json({ error: "Portfolio not found" });
+      return;
+    }
+    res.json(response);
+  } catch (err) {
+    logger.error({ err }, "Error fetching portfolio by token");
+    res.status(500).json({ error: "Failed to fetch portfolio" });
   }
-  res.json(response);
 });
 
 export default router;

@@ -120,6 +120,32 @@ export default function Portfolio() {
     persistProjectUpdates(next);
   };
 
+  // Sort projects by date (newest first)
+  const sortedProjects = useMemo(() => {
+    return [...projects].sort((a, b) => {
+      const aDate = new Date(a.endDate || a.createdAt || 0);
+      const bDate = new Date(b.endDate || b.createdAt || 0);
+      return bDate.getTime() - aDate.getTime();
+    });
+  }, [projects]);
+
+  const getStatusColor = (status: string) => {
+    switch(status) {
+      case "completed":
+        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
+      case "planning":
+        return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
+      case "in_progress":
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const formatStatus = (status: string) => {
+    return status.split("_").map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(" ");
+  };
+
   const handlePublish = async () => {
     if (!portfolio) return;
     try {
@@ -247,55 +273,64 @@ export default function Portfolio() {
             <div className="text-muted-foreground text-sm">No projects yet. Add one to start building your portfolio.</div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {projects.map((project, index) => (
-                <Card key={project.id} className="border-border/50">
-                  <CardHeader className="space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="text-lg">{project.title}</CardTitle>
-                        <CardDescription className="line-clamp-2">{project.description || "No description provided."}</CardDescription>
+              {sortedProjects.map((project, index) => {
+                const originalIndex = projects.findIndex(p => p.id === project.id);
+                return (
+                  <Card key={project.id} className="border-border/50">
+                    <CardHeader className="space-y-3">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <CardTitle className="text-lg">{project.title}</CardTitle>
+                          <CardDescription className="line-clamp-2">{project.description || "No description provided."}</CardDescription>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => moveProject(originalIndex, -1)}>
+                            <ArrowUp className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => moveProject(originalIndex, 1)}>
+                            <ArrowDown className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => moveProject(index, -1)}>
-                          <ArrowUp className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => moveProject(index, 1)}>
-                          <ArrowDown className="w-4 h-4" />
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge className={getStatusColor(project.completionStatus)}>
+                          {formatStatus(project.completionStatus)}
+                        </Badge>
+                        {project.category && (
+                          <Badge variant="outline">{project.category}</Badge>
+                        )}
+                        <Button variant="outline" size="sm" onClick={() => toggleFeatured(originalIndex)}>
+                          <Star className={`w-4 h-4 mr-2 ${project.isFeatured ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground"}`} />
+                          {project.isFeatured ? "Featured" : "Feature"}
                         </Button>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" onClick={() => toggleFeatured(index)}>
-                        <Star className={`w-4 h-4 mr-2 ${project.isFeatured ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground"}`} />
-                        {project.isFeatured ? "Featured" : "Feature"}
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex flex-wrap gap-2">
-                      {project.technologies.map((tech) => (
-                        <Badge key={tech} variant="outline">{tech}</Badge>
-                      ))}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {project.githubLink && (
-                        <Button asChild variant="outline" size="sm" className="gap-2">
-                          <a href={project.githubLink} target="_blank" rel="noreferrer">
-                            <Github className="w-4 h-4" /> GitHub
-                          </a>
-                        </Button>
-                      )}
-                      {project.liveLink && (
-                        <Button asChild variant="secondary" size="sm" className="gap-2">
-                          <a href={project.liveLink} target="_blank" rel="noreferrer">
-                            <ExternalLink className="w-4 h-4" /> Live
-                          </a>
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex flex-wrap gap-2">
+                        {project.technologies.map((tech) => (
+                          <Badge key={tech} variant="outline">{tech}</Badge>
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {project.githubLink && (
+                          <Button asChild variant="outline" size="sm" className="gap-2">
+                            <a href={project.githubLink} target="_blank" rel="noreferrer">
+                              <Github className="w-4 h-4" /> GitHub
+                            </a>
+                          </Button>
+                        )}
+                        {project.liveLink && (
+                          <Button asChild variant="secondary" size="sm" className="gap-2">
+                            <a href={project.liveLink} target="_blank" rel="noreferrer">
+                              <ExternalLink className="w-4 h-4" /> Live
+                            </a>
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </CardContent>

@@ -1,18 +1,19 @@
-import { pgTable, text, serial, timestamp } from "drizzle-orm/pg-core";
+import { mysqlTable, varchar, int, timestamp, json } from "drizzle-orm/mysql-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const jobsTable = pgTable("jobs", {
-  id: serial("id").primaryKey(),
-  title: text("title").notNull(),
-  company: text("company").notNull(),
-  location: text("location"),
-  experience: text("experience"),
-  requiredSkills: text("required_skills").array().notNull().default([]),
-  salary: text("salary"),
-  applyLink: text("apply_link"),
-  source: text("source").notNull().default("CareerStack"),
-  postedAt: timestamp("posted_at", { withTimezone: true }).notNull().defaultNow(),
+export const jobsTable = mysqlTable("jobs", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 512 }).notNull(),
+  company: varchar("company", { length: 255 }).notNull(),
+  location: varchar("location", { length: 255 }),
+  experience: varchar("experience", { length: 255 }),
+  // MySQL has no native array type — stored as JSON
+  requiredSkills: json("required_skills").$type<string[]>().notNull().default([]),
+  salary: varchar("salary", { length: 255 }),
+  applyLink: varchar("apply_link", { length: 2048 }),
+  source: varchar("source", { length: 255 }).notNull().default("CareerStack"),
+  postedAt: timestamp("posted_at").notNull().defaultNow(),
 });
 
 export const insertJobSchema = createInsertSchema(jobsTable).omit({ id: true });

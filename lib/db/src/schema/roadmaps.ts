@@ -1,31 +1,31 @@
-import { pgTable, text, serial, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { mysqlTable, varchar, int, tinyint, timestamp } from "drizzle-orm/mysql-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { usersTable } from "./users";
 
-export const roadmapsTable = pgTable("roadmaps", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
-  technology: text("technology").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+export const roadmapsTable = mysqlTable("roadmaps", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  technology: varchar("technology", { length: 255 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const milestonesTable = pgTable("milestones", {
-  id: serial("id").primaryKey(),
-  roadmapId: integer("roadmap_id").notNull().references(() => roadmapsTable.id, { onDelete: "cascade" }),
-  title: text("title").notNull(),
-  description: text("description"),
-  orderIndex: integer("order_index").notNull().default(0),
-  estimatedDuration: text("estimated_duration").notNull().default("1 week"),
-  industryRelevance: text("industry_relevance").notNull().default("Medium"),
-  status: text("status").notNull().default("not_started"),
+export const milestonesTable = mysqlTable("milestones", {
+  id: int("id").autoincrement().primaryKey(),
+  roadmapId: int("roadmap_id").notNull().references(() => roadmapsTable.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 512 }).notNull(),
+  description: varchar("description", { length: 4096 }),
+  orderIndex: int("order_index").notNull().default(0),
+  estimatedDuration: varchar("estimated_duration", { length: 255 }).notNull().default("1 week"),
+  industryRelevance: varchar("industry_relevance", { length: 100 }).notNull().default("Medium"),
+  status: varchar("status", { length: 100 }).notNull().default("not_started"),
 });
 
-export const tasksTable = pgTable("tasks", {
-  id: serial("id").primaryKey(),
-  milestoneId: integer("milestone_id").notNull().references(() => milestonesTable.id, { onDelete: "cascade" }),
-  title: text("title").notNull(),
-  completed: boolean("completed").notNull().default(false),
+export const tasksTable = mysqlTable("tasks", {
+  id: int("id").autoincrement().primaryKey(),
+  milestoneId: int("milestone_id").notNull().references(() => milestonesTable.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 512 }).notNull(),
+  completed: tinyint("completed").notNull().default(0),
 });
 
 export const insertRoadmapSchema = createInsertSchema(roadmapsTable).omit({ id: true, createdAt: true });

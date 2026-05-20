@@ -30,10 +30,12 @@ router.post("/profile", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const [user] = await db.insert(usersTable).values({
+  // MySQL doesn't support .returning() — insert then select
+  await db.insert(usersTable).values({
     ...parsed.data,
     clerkId,
-  }).returning();
+  });
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.clerkId, clerkId));
 
   res.status(201).json(GetProfileResponse.parse(user));
 });
@@ -46,15 +48,18 @@ router.patch("/profile", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const [user] = await db.update(usersTable)
+  const result = await db.update(usersTable)
     .set(parsed.data)
-    .where(eq(usersTable.clerkId, clerkId))
-    .returning();
+    .where(eq(usersTable.clerkId, clerkId));
 
-  if (!user) {
+  // affectedRows === 0 means the user didn't exist
+  if ((result[0] as any).affectedRows === 0) {
     res.status(404).json({ error: "Profile not found" });
     return;
   }
+
+  // MySQL doesn't support .returning() — fetch the updated row
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.clerkId, clerkId));
 
   res.json(UpdateProfileResponse.parse(user));
 });

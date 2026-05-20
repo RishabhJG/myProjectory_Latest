@@ -1,25 +1,28 @@
-import { pgTable, text, serial, integer, timestamp } from "drizzle-orm/pg-core";
+import { mysqlTable, varchar, int, timestamp, json, date } from "drizzle-orm/mysql-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { usersTable } from "./users";
 
-export const projectsTable = pgTable("projects", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
-  title: text("title").notNull(),
-  description: text("description"),
-  problemSolved: text("problem_solved"),
-  technologies: text("technologies").array().notNull().default([]),
-  difficultyLevel: text("difficulty_level").notNull().default("beginner"),
-  githubLink: text("github_link"),
-  liveLink: text("live_link"),
-  screenshotUrl: text("screenshot_url"),
-  duration: text("duration"),
-  role: text("role"),
-  category: text("category"),
-  completionStatus: text("completion_status").notNull().default("planning"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+export const projectsTable = mysqlTable("projects", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 512 }).notNull(),
+  description: varchar("description", { length: 4096 }),
+  problemSolved: varchar("problem_solved", { length: 4096 }),
+  // MySQL has no native array type — stored as JSON
+  technologies: json("technologies").$type<string[]>().notNull().default([]),
+  difficultyLevel: varchar("difficulty_level", { length: 100 }).notNull().default("beginner"),
+  githubLink: varchar("github_link", { length: 2048 }),
+  liveLink: varchar("live_link", { length: 2048 }),
+  screenshotUrl: varchar("screenshot_url", { length: 2048 }),
+  startDate: date("start_date"),
+  endDate: date("end_date"),
+  duration: varchar("duration", { length: 255 }),
+  role: varchar("role", { length: 255 }),
+  category: varchar("category", { length: 255 }),
+  completionStatus: varchar("completion_status", { length: 100 }).notNull().default("planning"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
 });
 
 export const insertProjectSchema = createInsertSchema(projectsTable).omit({ id: true, createdAt: true, updatedAt: true });

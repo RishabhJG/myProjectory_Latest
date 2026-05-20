@@ -121,6 +121,13 @@ export interface AddCertificationBody {
 
 // ─── Auth Fetch Helper ────────────────────────────────────────────────────────
 
+class FetchError extends Error {
+  constructor(message: string, public statusCode: number) {
+    super(message);
+    this.name = "FetchError";
+  }
+}
+
 function useAuthedFetch() {
   const { getToken } = useAuth();
 
@@ -142,7 +149,7 @@ function useAuthedFetch() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.error || `HTTP ${response.status}`);
+        throw new FetchError(errorData?.error || `HTTP ${response.status}`, response.status);
       }
 
       const text = await response.text();
@@ -164,7 +171,7 @@ function usePublicFetch() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.error || `HTTP ${response.status}`);
+        throw new FetchError(errorData?.error || `HTTP ${response.status}`, response.status);
       }
 
       const text = await response.text();
@@ -339,7 +346,7 @@ export function useMyPortfolio(options?: { query?: Partial<UseQueryOptions<Portf
       try {
         return await apiFetch<PortfolioResponse>("/api/portfolios/my");
       } catch (err) {
-        if ((err as Error).message?.includes("404")) {
+        if (err instanceof Error && (err as any).statusCode === 404) {
           return null;
         }
         throw err;

@@ -1,22 +1,23 @@
-import { pgTable, text, serial, integer, timestamp } from "drizzle-orm/pg-core";
+import { mysqlTable, varchar, int, timestamp, json } from "drizzle-orm/mysql-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const usersTable = pgTable("users", {
-  id: serial("id").primaryKey(),
-  clerkId: text("clerk_id").notNull().unique(),
-  name: text("name").notNull(),
-  email: text("email").notNull(),
-  college: text("college"),
-  degree: text("degree"),
-  graduationYear: integer("graduation_year"),
-  careerGoal: text("career_goal"),
-  preferredDomain: text("preferred_domain"),
-  interests: text("interests").array().notNull().default([]),
-  skills: text("skills").array().notNull().default([]),
-  profilePhotoUrl: text("profile_photo_url"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+export const usersTable = mysqlTable("users", {
+  id: int("id").autoincrement().primaryKey(),
+  clerkId: varchar("clerk_id", { length: 255 }).notNull().unique(),
+  name: varchar("name", { length: 512 }).notNull(),
+  email: varchar("email", { length: 512 }).notNull(),
+  college: varchar("college", { length: 512 }),
+  degree: varchar("degree", { length: 512 }),
+  graduationYear: int("graduation_year"),
+  careerGoal: varchar("career_goal", { length: 512 }),
+  preferredDomain: varchar("preferred_domain", { length: 255 }),
+  // MySQL has no native array type — stored as JSON
+  interests: json("interests").$type<string[]>().notNull().default([]),
+  skills: json("skills").$type<string[]>().notNull().default([]),
+  profilePhotoUrl: varchar("profile_photo_url", { length: 2048 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
 });
 
 export const insertUserSchema = createInsertSchema(usersTable).omit({ id: true, createdAt: true, updatedAt: true });

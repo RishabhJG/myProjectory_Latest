@@ -106,14 +106,18 @@ router.post("/roadmaps", requireAuth, async (req, res): Promise<void> => {
   const techLower = parsed.data.technology.toLowerCase();
   const template = ROADMAP_TEMPLATES[techLower] || getDefaultTemplate(parsed.data.technology);
 
-  const [roadmap] = await db.insert(roadmapsTable).values({
+  // MySQL doesn't support .returning() — insert then select
+  const roadmapResult = await db.insert(roadmapsTable).values({
     userId,
     technology: parsed.data.technology,
-  }).returning();
+  });
+  const roadmapId = (roadmapResult[0] as any).insertId;
+  const [roadmap] = await db.select().from(roadmapsTable).where(eq(roadmapsTable.id, roadmapId));
 
   for (let i = 0; i < template.milestones.length; i++) {
     const msTemplate = template.milestones[i];
-    const [milestone] = await db.insert(milestonesTable).values({
+    // MySQL doesn't support .returning() — insert then select
+    const msResult = await db.insert(milestonesTable).values({
       roadmapId: roadmap.id,
       title: msTemplate.title,
       description: msTemplate.description,
@@ -121,13 +125,14 @@ router.post("/roadmaps", requireAuth, async (req, res): Promise<void> => {
       estimatedDuration: msTemplate.estimatedDuration,
       industryRelevance: msTemplate.industryRelevance,
       status: "not_started",
-    }).returning();
+    });
+    const milestoneId = (msResult[0] as any).insertId;
 
     for (const taskTitle of msTemplate.tasks) {
       await db.insert(tasksTable).values({
-        milestoneId: milestone.id,
+        milestoneId,
         title: taskTitle,
-        completed: false,
+        completed: 0,
       });
     }
   }
@@ -228,10 +233,12 @@ router.patch("/roadmaps/:roadmapId/tasks/:taskId/toggle", requireAuth, async (re
     return;
   }
 
-  const [updated] = await db.update(tasksTable)
-    .set({ completed: !task.completed })
-    .where(eq(tasksTable.id, task.id))
-    .returning();
+  const newCompleted = task.completed ? 0 : 1;
+  // MySQL doesn't support .returning() — update then re-select
+  await db.update(tasksTable)
+    .set({ completed: newCompleted })
+    .where(eq(tasksTable.id, task.id));
+  const [updated] = await db.select().from(tasksTable).where(eq(tasksTable.id, task.id));
 
   if (!task.completed) {
     await db.insert(activityTable).values({
@@ -270,7 +277,7 @@ router.patch("/roadmaps/:roadmapId/tasks/:taskId/toggle", requireAuth, async (re
 
     const existingSkills = await db.select().from(userSkillsTable)
       .where(eq(userSkillsTable.userId, userId));
-    
+
     const techSkillName = roadmap.technology.trim();
     const existingSkill = existingSkills.find(s => s.name.toLowerCase() === techSkillName.toLowerCase());
 
@@ -328,17 +335,21 @@ router.delete("/roadmaps/:id", requireAuth, async (req, res): Promise<void> => {
       return;
     }
 
-    const [deleted] = await db.delete(roadmapsTable)
-      .where(and(eq(roadmapsTable.id, id), eq(roadmapsTable.userId, userId)))
-      .returning();
+    // Fetch before delete so we can use the technology name after
+    const [toDelete] = await db.select().from(roadmapsTable)
+      .where(and(eq(roadmapsTable.id, id), eq(roadmapsTable.userId, userId)));
 
-    if (!deleted) {
+    if (!toDelete) {
       res.status(404).json({ error: "Roadmap not found" });
       return;
     }
 
+    // MySQL doesn't support .returning() — delete and use pre-fetched row
+    await db.delete(roadmapsTable)
+      .where(and(eq(roadmapsTable.id, id), eq(roadmapsTable.userId, userId)));
+
     // ─── Delete Synced User Skill ───────────────────────────────────────────
-    const techSkillName = deleted.technology.trim();
+    const techSkillName = toDelete.technology.trim();
     await db.delete(userSkillsTable)
       .where(and(
         eq(userSkillsTable.userId, userId),
@@ -348,8 +359,8 @@ router.delete("/roadmaps/:id", requireAuth, async (req, res): Promise<void> => {
     await db.insert(activityTable).values({
       userId,
       type: "project_updated",
-      title: `Deleted roadmap: ${deleted.technology}`,
-      description: `Removed learning roadmap for ${deleted.technology}`,
+      title: `Deleted roadmap: ${toDelete.technology}`,
+      description: `Removed learning roadmap for ${toDelete.technology}`,
     });
 
     res.sendStatus(204);
