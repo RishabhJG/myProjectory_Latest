@@ -1,13 +1,13 @@
 import { Router, type IRouter } from "express";
 import { eq, and, sql } from "drizzle-orm";
-import { db, usersTable, projectsTable, jobsTable, roadmapsTable, milestonesTable, tasksTable } from "@workspace/db";
+import { db, usersTable, projectsTable, jobsTable, roadmapsTable, milestonesTable, tasksTable } from "../lib/db/index.js";
 import {
   GetTechComfortScoresResponse,
   GetMarketDemandScoresResponse,
   GetJobReadinessScoreResponse,
   GetStrengthsResponse,
   GetTrendAlignmentResponse,
-} from "@workspace/api-zod";
+} from "../lib/api-zod/index.js";
 import { requireAuth } from "../middlewares/requireAuth";
 import { getAnalysisWeights, getUserScoringWeights, calculateReadinessScore } from "../services/scoring.service";
 

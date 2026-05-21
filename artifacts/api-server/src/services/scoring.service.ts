@@ -6,7 +6,7 @@ import {
   projectsTable,
   userSkillsTable,
   userCertificationsTable
-} from "@workspace/db";
+} from "../lib/db/index.js";
 
 export interface ScoringWeights {
   projectsWeight: number;

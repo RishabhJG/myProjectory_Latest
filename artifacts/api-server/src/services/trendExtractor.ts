@@ -1,4 +1,4 @@
-import { db, jobListingsTable, trendSkillsTable, trendRolesTable } from "@workspace/db";
+import { db, jobListingsTable, trendSkillsTable, trendRolesTable } from "../lib/db/index.js";
 import { gt, eq, sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 

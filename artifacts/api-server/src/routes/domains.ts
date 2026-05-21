@@ -6,9 +6,9 @@ import {
   domainCategoriesTable,
   domainRoleMapTable,
   domainSkillMapTable,
-} from "@workspace/db";
+} from "../lib/db/index.js";
 import { requireAdmin } from "../middlewares/requireAuth";
-import { GetDomainResponse, CreateDomainBody } from "@workspace/api-zod";
+import { GetDomainResponse, CreateDomainBody } from "../lib/api-zod/index.js";
 
 const router: IRouter = Router();
 

@@ -1,10 +1,10 @@
 import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
-import { db, usersTable, projectsTable, roadmapsTable, milestonesTable, tasksTable, jobsTable, activityTable } from "@workspace/db";
+import { db, usersTable, projectsTable, roadmapsTable, milestonesTable, tasksTable, jobsTable, activityTable } from "../lib/db/index.js";
 import {
   GetDashboardSummaryResponse,
   GetRecentActivityResponse,
-} from "@workspace/api-zod";
+} from "../lib/api-zod/index.js";
 import { requireAuth } from "../middlewares/requireAuth";
 
 const router: IRouter = Router();

@@ -11,7 +11,7 @@ import {
   userSkillsTable,
   userCertificationsTable,
   userScoreWeightsTable,
-} from "@workspace/db";
+} from "../lib/db/index.js";
 import { requireAuth } from "../middlewares/requireAuth";
 import { getUserScoringWeights, type ScoringWeights } from "../services/scoring.service";
 

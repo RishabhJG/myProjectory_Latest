@@ -8,7 +8,7 @@ import { Router, type IRouter } from "express";
 import { requireAuth, requireAdmin } from "../middlewares/requireAuth";
 import { scrapeAllSources, addJobSource, loadJobSources } from "../services/job-intelligence/scraper";
 import { analyzeTrends, getTop3Stacks } from "../services/job-intelligence/trendAnalyzer";
-import { db, scrapedJobPostingsTable } from "@workspace/db";
+import { db, scrapedJobPostingsTable } from "../lib/db/index.js";
 import { desc } from "drizzle-orm";
 import { z } from "zod";
 

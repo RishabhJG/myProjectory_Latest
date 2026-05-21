@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, and, sql } from "drizzle-orm";
 import { clerkClient } from "@clerk/express";
-import { db, usersTable, projectsTable, activityTable, portfoliosTable, portfolioProjectsTable } from "@workspace/db";
+import { db, usersTable, projectsTable, activityTable, portfoliosTable, portfolioProjectsTable } from "../lib/db/index.js";
 import {
   CreateProjectBody,
   UpdateProjectBody,
@@ -11,7 +11,7 @@ import {
   UpdateProjectResponse,
   DeleteProjectParams,
   ListProjectsResponse,
-} from "@workspace/api-zod";
+} from "../lib/api-zod/index.js";
 import { requireAuth } from "../middlewares/requireAuth";
 import { logger } from "../lib/logger";
 

@@ -9,7 +9,7 @@ import {
   domainsTable,
   domainSkillMapTable,
   stackRoadmapMapTable,
-} from "@workspace/db";
+} from "../lib/db/index.js";
 import { requireAuth } from "../middlewares/requireAuth";
 
 const router: IRouter = Router();

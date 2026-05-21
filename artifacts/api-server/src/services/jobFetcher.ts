@@ -1,5 +1,5 @@
 import axios from "axios";
-import { db, jobListingsTable, type InsertJobListing } from "@workspace/db";
+import { db, jobListingsTable, type InsertJobListing } from "../lib/db/index.js";
 import { logger } from "../lib/logger";
 
 const ADZUNA_APP_ID = process.env.ADZUNA_APP_ID || "PLACEHOLDER_APP_ID";

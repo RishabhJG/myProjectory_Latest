@@ -13,7 +13,7 @@ import {
   activityTable,
   portfoliosTable,
   portfolioProjectsTable,
-} from "@workspace/db";
+} from "../lib/db/index.js";
 import { requireAuth } from "../middlewares/requireAuth";
 import { logger } from "../lib/logger";
 

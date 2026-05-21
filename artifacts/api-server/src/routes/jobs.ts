@@ -1,11 +1,11 @@
 import { Router, type IRouter } from "express";
 import { eq, and, ilike } from "drizzle-orm";
-import { db, usersTable, projectsTable, jobsTable } from "@workspace/db";
+import { db, usersTable, projectsTable, jobsTable } from "../lib/db/index.js";
 import {
   ListJobsQueryParams,
   ListJobsResponse,
   GetJobMatchesResponse,
-} from "@workspace/api-zod";
+} from "../lib/api-zod/index.js";
 import { requireAuth } from "../middlewares/requireAuth";
 
 const router: IRouter = Router();

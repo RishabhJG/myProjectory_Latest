@@ -6,7 +6,7 @@
  * Persists results to the tech_trends database table.
  */
 
-import { db, scrapedJobPostingsTable, techTrendsTable } from "@workspace/db";
+import { db, scrapedJobPostingsTable, techTrendsTable } from "../../lib/db/index.js";
 import { sql, desc } from "drizzle-orm";
 import { detectStackCombinations } from "./techStackExtractor";
 import { logger } from "../../lib/logger";

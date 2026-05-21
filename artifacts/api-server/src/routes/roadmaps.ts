@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
-import { db, usersTable, roadmapsTable, milestonesTable, tasksTable, activityTable, userSkillsTable } from "@workspace/db";
+import { db, usersTable, roadmapsTable, milestonesTable, tasksTable, activityTable, userSkillsTable } from "../lib/db/index.js";
 import {
   GenerateRoadmapBody,
   GetRoadmapParams,
@@ -8,7 +8,7 @@ import {
   ListRoadmapsResponse,
   ToggleTaskParams,
   ToggleTaskResponse,
-} from "@workspace/api-zod";
+} from "../lib/api-zod/index.js";
 import { requireAuth } from "../middlewares/requireAuth";
 
 const router: IRouter = Router();

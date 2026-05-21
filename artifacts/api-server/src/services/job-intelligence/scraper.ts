@@ -7,7 +7,7 @@
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { resolve, join } from "path";
-import { db, scrapedJobPostingsTable, type InsertScrapedJobPosting } from "@workspace/db";
+import { db, scrapedJobPostingsTable, type InsertScrapedJobPosting } from "../../lib/db/index.js";
 import { sql } from "drizzle-orm";
 import { parseJobUrl, type ScrapedJobData } from "./parser";
 import { logger } from "../../lib/logger";

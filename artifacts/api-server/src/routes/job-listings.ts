@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, ilike, inArray, gte, desc } from "drizzle-orm";
-import { db, usersTable, jobListingsTable, userSavedJobsTable } from "@workspace/db";
+import { db, usersTable, jobListingsTable, userSavedJobsTable } from "../lib/db/index.js";
 import { requireAuth } from "../middlewares/requireAuth";
 import { z } from "zod";
 
