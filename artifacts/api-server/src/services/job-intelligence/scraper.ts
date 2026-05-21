@@ -98,8 +98,7 @@ async function storeScrapedJob(data: ScrapedJobData): Promise<void> {
   await db
     .insert(scrapedJobPostingsTable)
     .values(jobData)
-    .onConflictDoUpdate({
-      target: scrapedJobPostingsTable.sourceUrl,
+    .onDuplicateKeyUpdate({
       set: {
         title: jobData.title,
         company: jobData.company,

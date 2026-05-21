@@ -18,6 +18,6 @@ export const jobListingsTable = mysqlTable("job_listings", {
   isActive: tinyint("is_active").notNull().default(1),
 });
 
-export const insertJobListingSchema = createInsertSchema(jobListingsTable).omit({ id: true });
+export const insertJobListingSchema = createInsertSchema(jobListingsTable).omit({ id: true }).strict() as unknown as z.ZodType<any, z.ZodTypeDef, any>;
 export type InsertJobListing = z.infer<typeof insertJobListingSchema>;
 export type JobListing = typeof jobListingsTable.$inferSelect;

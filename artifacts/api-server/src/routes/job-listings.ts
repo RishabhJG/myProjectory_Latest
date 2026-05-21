@@ -33,8 +33,8 @@ router.get("/job-listings", requireAuth, async (req, res): Promise<void> => {
   const offset = (page - 1) * limit;
 
   const conditions = [];
-  if (domain) conditions.push(eq(jobListingsTable.domain, domain));
-  if (location) conditions.push(ilike(jobListingsTable.location, `%${location}%`));
+  if (domain) conditions.push(eq(jobListingsTable.domain, (domain as any) as string));
+  if (location) conditions.push(ilike(jobListingsTable.location, `%${(location as any) as string}%`));
   if (daysOld) {
     const date = new Date();
     date.setDate(date.getDate() - daysOld);
@@ -53,7 +53,7 @@ router.get("/job-listings", requireAuth, async (req, res): Promise<void> => {
   if (skills) {
     const skillList = skills.toLowerCase().split(",").map(s => s.trim());
     filtered = results.filter(j => 
-      skillList.every(s => j.requiredSkills.map(rs => rs.toLowerCase()).includes(s))
+      skillList.every(s => ((j.requiredSkills as string[]) || []).map(rs => rs.toLowerCase()).includes(s))
     );
   }
 
@@ -83,7 +83,7 @@ router.get("/job-listings/:id", requireAuth, async (req, res): Promise<void> => 
     isSaved = !!saved;
   }
 
-  res.json({ ...job, isSaved });
+  res.json({ ...job, isSaved, requiredSkills: (job.requiredSkills as string[]) || [] });
 });
 
 // ─── S6.7: Save Job ──────────────────────────────────────────────────────────

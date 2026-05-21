@@ -13,6 +13,6 @@ export const stackRoadmapMapTable = mysqlTable("stack_roadmap_map", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const insertStackRoadmapMapSchema = createInsertSchema(stackRoadmapMapTable).omit({ id: true, createdAt: true });
+export const insertStackRoadmapMapSchema = createInsertSchema(stackRoadmapMapTable).omit({ id: true, createdAt: true }).strict() as unknown as z.ZodType<any, z.ZodTypeDef, any>;
 export type InsertStackRoadmapMap = z.infer<typeof insertStackRoadmapMapSchema>;
 export type StackRoadmapMap = typeof stackRoadmapMapTable.$inferSelect;

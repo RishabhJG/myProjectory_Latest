@@ -12,6 +12,6 @@ export const activityTable = mysqlTable("activity", {
   timestamp: timestamp("timestamp").notNull().defaultNow(),
 });
 
-export const insertActivitySchema = createInsertSchema(activityTable).omit({ id: true });
+export const insertActivitySchema = createInsertSchema(activityTable).omit({ id: true }).strict() as unknown as z.ZodType<any, z.ZodTypeDef, any>;
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
 export type Activity = typeof activityTable.$inferSelect;

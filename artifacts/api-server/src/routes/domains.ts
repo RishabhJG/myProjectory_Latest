@@ -69,25 +69,25 @@ router.post("/domains", requireAdmin, async (req, res): Promise<void> => {
     name: body.name,
     description: body.description,
     priority: body.priority,
-    isVisible: body.isVisible,
+    isVisible: body.isVisible ? 1 : 0,
   });
   const [newDomain] = await db.select().from(domainsTable).where(eq(domainsTable.name, body.name));
 
   if (body.categories && body.categories.length > 0) {
     await db.insert(domainCategoriesTable).values(
-      body.categories.map(name => ({ domainId: newDomain.id, name }))
+      (body.categories as string[]).map(name => ({ domainId: newDomain.id, name }))
     );
   }
 
   if (body.roles && body.roles.length > 0) {
     await db.insert(domainRoleMapTable).values(
-      body.roles.map(role => ({ domainId: newDomain.id, role }))
+      (body.roles as string[]).map(role => ({ domainId: newDomain.id, role }))
     );
   }
 
   if (body.skills && body.skills.length > 0) {
     await db.insert(domainSkillMapTable).values(
-      body.skills.map(skill => ({ domainId: newDomain.id, skill }))
+      (body.skills as string[]).map(skill => ({ domainId: newDomain.id, skill }))
     );
   }
 
@@ -111,7 +111,7 @@ router.patch("/domains/:id", requireAdmin, async (req, res): Promise<void> => {
       name: body.name,
       description: body.description,
       priority: body.priority,
-      isVisible: body.isVisible,
+      isVisible: body.isVisible ? 1 : 0,
     })
     .where(eq(domainsTable.id, domainId));
 
@@ -128,28 +128,31 @@ router.patch("/domains/:id", requireAdmin, async (req, res): Promise<void> => {
   await db.delete(domainSkillMapTable).where(eq(domainSkillMapTable.domainId, domainId));
 
   if (body.categories && body.categories.length > 0) {
+    const cats = Array.isArray(body.categories) ? body.categories : [body.categories as any as string];
     await db.insert(domainCategoriesTable).values(
-      body.categories.map(name => ({ domainId: domainId, name }))
+      cats.map(name => ({ domainId: domainId, name: name as any as string }))
     );
   }
 
   if (body.roles && body.roles.length > 0) {
+    const rolez = Array.isArray(body.roles) ? body.roles : [body.roles as any as string];
     await db.insert(domainRoleMapTable).values(
-      body.roles.map(role => ({ domainId: domainId, role }))
+      rolez.map(role => ({ domainId: domainId, role: role as any as string }))
     );
   }
 
   if (body.skills && body.skills.length > 0) {
+    const skillz = Array.isArray(body.skills) ? body.skills : [body.skills as any as string];
     await db.insert(domainSkillMapTable).values(
-      body.skills.map(skill => ({ domainId: domainId, skill }))
+      skillz.map(skill => ({ domainId: domainId, skill: skill as any as string }))
     );
   }
 
   const domainResponse = {
     ...updatedDomain,
-    categories: body.categories || [],
-    roles: body.roles || [],
-    skills: body.skills || [],
+    categories: ((body.categories as any) || []) as string[],
+    roles: ((body.roles as any) || []) as string[],
+    skills: ((body.skills as any) || []) as string[],
   };
 
   res.json(GetDomainResponse.parse(domainResponse));

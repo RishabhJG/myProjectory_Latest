@@ -50,8 +50,7 @@ export async function fetchAndStoreJobs() {
         };
 
         // Upsert logic (by sourceUrl)
-        await db.insert(jobListingsTable).values(jobData).onConflictDoUpdate({
-           target: jobListingsTable.sourceUrl, // Wait, sourceUrl is not unique in schema. Re-checking schema.
+        await db.insert(jobListingsTable).values(jobData).onDuplicateKeyUpdate({
            set: { fetchedAt: new Date() }
         });
       }

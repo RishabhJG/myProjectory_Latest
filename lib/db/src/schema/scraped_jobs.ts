@@ -21,7 +21,7 @@ export const scrapedJobPostingsTable = mysqlTable("scraped_job_postings", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const insertScrapedJobPostingSchema = createInsertSchema(scrapedJobPostingsTable).omit({ id: true, createdAt: true });
+export const insertScrapedJobPostingSchema = createInsertSchema(scrapedJobPostingsTable).omit({ id: true, createdAt: true }).strict() as unknown as z.ZodType<any, z.ZodTypeDef, any>;
 export type InsertScrapedJobPosting = z.infer<typeof insertScrapedJobPostingSchema>;
 export type ScrapedJobPosting = typeof scrapedJobPostingsTable.$inferSelect;
 
@@ -36,6 +36,6 @@ export const techTrendsTable = mysqlTable("tech_trends", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-export const insertTechTrendSchema = createInsertSchema(techTrendsTable).omit({ id: true });
+export const insertTechTrendSchema = createInsertSchema(techTrendsTable).omit({ id: true }).strict() as unknown as z.ZodType<any, z.ZodTypeDef, any>;
 export type InsertTechTrend = z.infer<typeof insertTechTrendSchema>;
 export type TechTrend = typeof techTrendsTable.$inferSelect;

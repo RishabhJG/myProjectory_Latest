@@ -38,7 +38,7 @@ export const requireAdmin = async (req: Request, res: Response, next: NextFuncti
   }
   
   try {
-    const user = await clerkClient.users.getUser(userId);
+    const user = await clerkClient.users.getUser(userId as string);
     const role = user.publicMetadata?.role;
     
     if (role !== "admin") {

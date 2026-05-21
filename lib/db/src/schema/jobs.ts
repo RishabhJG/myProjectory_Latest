@@ -16,6 +16,6 @@ export const jobsTable = mysqlTable("jobs", {
   postedAt: timestamp("posted_at").notNull().defaultNow(),
 });
 
-export const insertJobSchema = createInsertSchema(jobsTable).omit({ id: true });
+export const insertJobSchema = createInsertSchema(jobsTable).omit({ id: true }).strict() as unknown as z.ZodType<any, z.ZodTypeDef, any>;
 export type InsertJob = z.infer<typeof insertJobSchema>;
 export type Job = typeof jobsTable.$inferSelect;

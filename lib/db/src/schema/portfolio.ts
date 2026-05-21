@@ -28,7 +28,7 @@ export const portfoliosTable = mysqlTable("portfolios", {
   updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
 });
 
-export const insertPortfolioSchema = createInsertSchema(portfoliosTable).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPortfolioSchema = createInsertSchema(portfoliosTable).omit({ id: true, createdAt: true, updatedAt: true }).strict() as unknown as z.ZodType<any, z.ZodTypeDef, any>;
 export type InsertPortfolio = z.infer<typeof insertPortfolioSchema>;
 export type Portfolio = typeof portfoliosTable.$inferSelect;
 
@@ -42,7 +42,7 @@ export const portfolioProjectsTable = mysqlTable("portfolio_projects", {
   isFeatured: tinyint("is_featured").notNull().default(0),
 });
 
-export const insertPortfolioProjectSchema = createInsertSchema(portfolioProjectsTable).omit({ id: true });
+export const insertPortfolioProjectSchema = createInsertSchema(portfolioProjectsTable).omit({ id: true }).strict() as unknown as z.ZodType<any, z.ZodTypeDef, any>;
 export type InsertPortfolioProject = z.infer<typeof insertPortfolioProjectSchema>;
 export type PortfolioProject = typeof portfolioProjectsTable.$inferSelect;
 
@@ -56,7 +56,7 @@ export const userSkillsTable = mysqlTable("user_skills", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const insertUserSkillSchema = createInsertSchema(userSkillsTable).omit({ id: true, createdAt: true });
+export const insertUserSkillSchema = createInsertSchema(userSkillsTable).omit({ id: true, createdAt: true }).strict() as unknown as z.ZodType<any, z.ZodTypeDef, any>;
 export type InsertUserSkill = z.infer<typeof insertUserSkillSchema>;
 export type UserSkill = typeof userSkillsTable.$inferSelect;
 
@@ -72,7 +72,7 @@ export const userCertificationsTable = mysqlTable("user_certifications", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const insertUserCertificationSchema = createInsertSchema(userCertificationsTable).omit({ id: true, createdAt: true });
+export const insertUserCertificationSchema = createInsertSchema(userCertificationsTable).omit({ id: true, createdAt: true }).strict() as unknown as z.ZodType<any, z.ZodTypeDef, any>;
 export type InsertUserCertification = z.infer<typeof insertUserCertificationSchema>;
 export type UserCertification = typeof userCertificationsTable.$inferSelect;
 
@@ -85,6 +85,6 @@ export const projectStackTagsTable = mysqlTable("project_stack_tags", {
   taggedAt: timestamp("tagged_at").notNull().defaultNow(),
 });
 
-export const insertProjectStackTagSchema = createInsertSchema(projectStackTagsTable).omit({ id: true, taggedAt: true });
+export const insertProjectStackTagSchema = createInsertSchema(projectStackTagsTable).omit({ id: true, taggedAt: true }).strict() as unknown as z.ZodType<any, z.ZodTypeDef, any>;
 export type InsertProjectStackTag = z.infer<typeof insertProjectStackTagSchema>;
 export type ProjectStackTag = typeof projectStackTagsTable.$inferSelect;

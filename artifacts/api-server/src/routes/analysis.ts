@@ -26,6 +26,10 @@ async function getUserId(clerkId: string): Promise<number | null> {
 
 router.get("/analysis/weights", requireAuth, async (req, res): Promise<void> => {
   const userId = await getUserId((req as any).clerkUserId);
+  if (!userId) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
   const w = await getUserScoringWeights(userId);
   res.json({
     weights: [

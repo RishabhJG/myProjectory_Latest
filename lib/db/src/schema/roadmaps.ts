@@ -28,14 +28,14 @@ export const tasksTable = mysqlTable("tasks", {
   completed: tinyint("completed").notNull().default(0),
 });
 
-export const insertRoadmapSchema = createInsertSchema(roadmapsTable).omit({ id: true, createdAt: true });
+export const insertRoadmapSchema = createInsertSchema(roadmapsTable).omit({ id: true, createdAt: true }).strict() as unknown as z.ZodType<any, z.ZodTypeDef, any>;
 export type InsertRoadmap = z.infer<typeof insertRoadmapSchema>;
 export type Roadmap = typeof roadmapsTable.$inferSelect;
 
-export const insertMilestoneSchema = createInsertSchema(milestonesTable).omit({ id: true });
+export const insertMilestoneSchema = createInsertSchema(milestonesTable).omit({ id: true }).strict() as unknown as z.ZodType<any, z.ZodTypeDef, any>;
 export type InsertMilestone = z.infer<typeof insertMilestoneSchema>;
 export type MilestoneRow = typeof milestonesTable.$inferSelect;
 
-export const insertTaskSchema = createInsertSchema(tasksTable).omit({ id: true });
+export const insertTaskSchema = createInsertSchema(tasksTable).omit({ id: true }).strict() as unknown as z.ZodType<any, z.ZodTypeDef, any>;
 export type InsertTask = z.infer<typeof insertTaskSchema>;
 export type TaskRow = typeof tasksTable.$inferSelect;

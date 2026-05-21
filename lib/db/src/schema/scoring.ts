@@ -13,6 +13,6 @@ export const userScoreWeightsTable = mysqlTable("user_score_weights", {
   updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
 });
 
-export const insertUserScoreWeightSchema = createInsertSchema(userScoreWeightsTable).omit({ id: true, updatedAt: true });
+export const insertUserScoreWeightSchema = createInsertSchema(userScoreWeightsTable).omit({ id: true, updatedAt: true }).strict() as unknown as z.ZodType<any, z.ZodTypeDef, any>;
 export type InsertUserScoreWeight = z.infer<typeof insertUserScoreWeightSchema>;
 export type UserScoreWeight = typeof userScoreWeightsTable.$inferSelect;

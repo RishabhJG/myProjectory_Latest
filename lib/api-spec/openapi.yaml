@@ -665,6 +665,10 @@ components:
           type: string
         screenshotUrl:
           type: string
+        startDate:
+          type: string
+        endDate:
+          type: string
         duration:
           type: string
         role:
@@ -701,6 +705,10 @@ components:
         liveLink:
           type: string
         screenshotUrl:
+          type: string
+        startDate:
+          type: string
+        endDate:
           type: string
         duration:
           type: string

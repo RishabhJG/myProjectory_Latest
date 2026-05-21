@@ -17,6 +17,8 @@ export interface UpdateProjectBody {
   githubLink?: string;
   liveLink?: string;
   screenshotUrl?: string;
+  startDate?: string;
+  endDate?: string;
   duration?: string;
   role?: string;
   category?: string;

@@ -13,6 +13,6 @@ export const analysisConfigTable = mysqlTable("analysis_config", {
   updatedAt: timestamp("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
 });
 
-export const insertAnalysisConfigSchema = createInsertSchema(analysisConfigTable).omit({ id: true, updatedAt: true });
+export const insertAnalysisConfigSchema = createInsertSchema(analysisConfigTable).omit({ id: true, updatedAt: true }).strict() as unknown as z.ZodType<any, z.ZodTypeDef, any>;
 export type InsertAnalysisConfig = z.infer<typeof insertAnalysisConfigSchema>;
 export type AnalysisConfig = typeof analysisConfigTable.$inferSelect;

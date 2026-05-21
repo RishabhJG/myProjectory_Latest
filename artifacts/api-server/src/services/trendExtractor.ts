@@ -32,8 +32,7 @@ export async function extractAndSyncTrends() {
       name,
       demandCount: count,
       lastSeenAt: new Date(),
-    }).onConflictDoUpdate({
-      target: trendSkillsTable.name,
+    }).onDuplicateKeyUpdate({
       set: { 
         demandCount: sql`${trendSkillsTable.demandCount} + ${count}`,
         lastSeenAt: new Date()
@@ -47,8 +46,7 @@ export async function extractAndSyncTrends() {
       title,
       demandCount: count,
       lastSeenAt: new Date(),
-    }).onConflictDoUpdate({
-      target: trendRolesTable.title,
+    }).onDuplicateKeyUpdate({
       set: { 
         demandCount: sql`${trendRolesTable.demandCount} + ${count}`,
         lastSeenAt: new Date()

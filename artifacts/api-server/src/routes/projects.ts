@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { clerkClient } from "@clerk/express";
-import { db, usersTable, projectsTable, activityTable } from "@workspace/db";
+import { db, usersTable, projectsTable, activityTable, portfoliosTable, portfolioProjectsTable } from "@workspace/db";
 import {
   CreateProjectBody,
   UpdateProjectBody,
@@ -85,13 +85,44 @@ router.post("/projects", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
+  // Convert empty strings to undefined for optional fields, and strings to Dates for date fields
+  const cleanedData = Object.fromEntries(
+    Object.entries(parsed.data).map(([key, value]) => {
+      if (typeof value === 'string' && value === '') {
+        return [key, undefined];
+      }
+      // Convert date strings to Date objects for startDate and endDate
+      if ((key === 'startDate' || key === 'endDate') && typeof value === 'string') {
+        return [key, new Date(value)];
+      }
+      return [key, value];
+    })
+  ) as any;
+
   // MySQL doesn't support .returning() — insert then select by userId + title
   const result = await db.insert(projectsTable).values({
-    ...parsed.data,
+    ...cleanedData,
     userId,
   });
   const insertId = (result[0] as any).insertId;
   const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, insertId));
+
+  // Get or create portfolio and link the project to it
+  const [existingPortfolio] = await db.select().from(portfoliosTable).where(eq(portfoliosTable.studentId, userId));
+  
+  if (existingPortfolio) {
+    // Get the current max display order for this portfolio
+    const maxOrder = await db.select({ maxOrder: sql<number>`MAX(${portfolioProjectsTable.displayOrder})` }).from(portfolioProjectsTable).where(eq(portfolioProjectsTable.portfolioId, existingPortfolio.id));
+    const nextOrder = (maxOrder[0]?.maxOrder ?? -1) + 1;
+    
+    // Link the project to the portfolio
+    await db.insert(portfolioProjectsTable).values({
+      portfolioId: existingPortfolio.id,
+      projectId: insertId,
+      displayOrder: nextOrder,
+      isFeatured: 0,
+    });
+  }
 
   await db.insert(activityTable).values({
     userId,
@@ -142,9 +173,17 @@ router.patch("/projects/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
+  // Convert empty strings to undefined for optional fields
+  const cleanedData = Object.fromEntries(
+    Object.entries(parsed.data).map(([key, value]) => [
+      key,
+      typeof value === 'string' && value === '' ? undefined : value
+    ])
+  );
+
   // MySQL doesn't support .returning() — update then select
   const result = await db.update(projectsTable)
-    .set(parsed.data)
+    .set(cleanedData)
     .where(and(eq(projectsTable.id, params.data.id), eq(projectsTable.userId, userId)));
 
   if ((result[0] as any).affectedRows === 0) {
