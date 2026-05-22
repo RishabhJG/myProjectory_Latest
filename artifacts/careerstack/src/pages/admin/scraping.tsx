@@ -18,6 +18,8 @@ import {
   ExternalLink,
   BarChart3,
   Layers,
+  Search,
+  AlertCircle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -89,6 +91,11 @@ export default function AdminScrapingPortal() {
   const [addingUrl, setAddingUrl] = useState(false);
   const [sources, setSources] = useState<JobSource[]>([]);
   const [loadingSources, setLoadingSources] = useState(false);
+
+  // Naukri scraper state
+  const [naukriUrl, setNaukriUrl] = useState("");
+  const [naukriScraping, setNaukriScraping] = useState(false);
+  const [naukriResult, setNaukriResult] = useState<ScrapeResult | null>(null);
 
   // ─── Load data on mount ──────────────────────────────────────────────────
 
@@ -205,13 +212,51 @@ export default function AdminScrapingPortal() {
   // ─── Remove Source URL ───────────────────────────────────────────────────
 
   async function handleRemoveSource(urlToRemove: string) {
-    // Note: The backend doesn't have a remove endpoint yet, 
+    // Note: The backend doesn't have a remove endpoint yet,
     // but we can prepare the UI for when it's added
     toast({
       title: "Not Implemented",
       description: "Remove functionality requires backend update",
       variant: "destructive",
     });
+  }
+
+  // ─── Naukri Listing Scrape ───────────────────────────────────────────────
+
+  async function handleNaukriScrape() {
+    if (!naukriUrl.trim()) return;
+    setNaukriScraping(true);
+    setNaukriResult(null);
+    try {
+      const res = await fetchWithAuth("/jobs/scrape-naukri", {
+        method: "POST",
+        body: JSON.stringify({ url: naukriUrl.trim() }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setNaukriResult(data);
+        await loadTrends();
+        toast({
+          title: "Naukri Scrape Complete",
+          description: `Scraped ${data.scrape.success} jobs from Naukri listing`,
+        });
+      } else {
+        const err = await res.json().catch(() => ({ error: "Unknown error" }));
+        toast({
+          title: "Naukri Scrape Failed",
+          description: err.error || `Server returned ${res.status}`,
+          variant: "destructive",
+        });
+      }
+    } catch (err: any) {
+      toast({
+        title: "Network Error",
+        description: err.message || "Is the backend running?",
+        variant: "destructive",
+      });
+    } finally {
+      setNaukriScraping(false);
+    }
   }
 
   if (loading) {
@@ -318,6 +363,121 @@ export default function AdminScrapingPortal() {
           </Card>
         </motion.div>
       </div>
+
+      {/* ─── Naukri Listing Scraper ─────────────────────────────────────────── */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
+        <Card className="glass rounded-2xl border-orange-500/20 bg-gradient-to-br from-orange-500/5 to-transparent">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Search className="w-5 h-5 text-orange-500" />
+              Naukri.com Listing Scraper
+            </CardTitle>
+            <CardDescription>
+              Paste a Naukri search/listing page URL to scrape all job postings across every page.
+              <span className="block mt-1 text-orange-500/80 font-medium">
+                This may take several minutes depending on the number of pages.
+              </span>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-3">
+              <Input
+                placeholder="https://www.naukri.com/computer-science-freshers-jobs-in-vadodara"
+                value={naukriUrl}
+                onChange={(e) => setNaukriUrl(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && !naukriScraping && handleNaukriScrape()}
+                className="rounded-xl flex-1"
+                disabled={naukriScraping}
+              />
+              <Button
+                onClick={handleNaukriScrape}
+                disabled={naukriScraping || !naukriUrl.trim()}
+                className="rounded-xl bg-orange-500 hover:bg-orange-600 text-white shrink-0"
+                size="lg"
+              >
+                {naukriScraping ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Scraping...
+                  </>
+                ) : (
+                  <>
+                    <Search className="w-4 h-4 mr-2" />
+                    Scrape Naukri
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {naukriScraping && (
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 text-sm text-orange-700 dark:text-orange-400">
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>
+                  Scraping all pages — please wait. This typically takes 2–5 minutes for a full listing page.
+                  Do not close this tab.
+                </span>
+              </div>
+            )}
+
+            {/* Naukri scrape results */}
+            <AnimatePresence>
+              {naukriResult && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-3"
+                >
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="p-3 rounded-xl bg-primary/5 border border-primary/10 text-center">
+                      <p className="text-xl font-bold text-primary">{naukriResult.scrape.total}</p>
+                      <p className="text-xs text-muted-foreground">Total Jobs</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-green-500/5 border border-green-500/10 text-center">
+                      <p className="text-xl font-bold text-green-600">{naukriResult.scrape.success}</p>
+                      <p className="text-xs text-muted-foreground">Stored</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-red-500/5 border border-red-500/10 text-center">
+                      <p className="text-xl font-bold text-red-600">{naukriResult.scrape.failed}</p>
+                      <p className="text-xs text-muted-foreground">Failed</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 max-h-[240px] overflow-y-auto">
+                    {naukriResult.scrape.results.map((r, i) => (
+                      <div
+                        key={i}
+                        className={`flex items-center justify-between p-2.5 rounded-lg border text-sm ${
+                          r.status === "success"
+                            ? "border-green-500/20 bg-green-500/5"
+                            : "border-red-500/20 bg-red-500/5"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          {r.status === "success" ? (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                          ) : (
+                            <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                          )}
+                          <span className="truncate font-medium">{r.title || r.url}</span>
+                          {r.error && (
+                            <span className="text-xs text-red-500 truncate">— {r.error}</span>
+                          )}
+                        </div>
+                        {r.stackCount !== undefined && (
+                          <span className="text-xs text-muted-foreground shrink-0 ml-2">
+                            {r.stackCount} techs
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </CardContent>
+        </Card>
+      </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* ─── Manage Sources ────────────────────────────────────────────── */}

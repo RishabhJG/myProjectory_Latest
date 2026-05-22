@@ -7,6 +7,7 @@
 import { Router, type IRouter } from "express";
 import { requireAuth, requireAdmin } from "../middlewares/requireAuth";
 import { scrapeAllSources, addJobSource, loadJobSources } from "../services/job-intelligence/scraper";
+import { scrapeNaukriListingPage } from "../services/job-intelligence/naukriScraper";
 import { analyzeTrends, getTop3Stacks } from "../services/job-intelligence/trendAnalyzer";
 import { db, scrapedJobPostingsTable } from "../lib/db/index.js";
 import { desc } from "drizzle-orm";
@@ -55,6 +56,41 @@ router.post("/jobs/add-source", requireAdmin, async (req, res): Promise<void> =>
     res.status(201).json(result);
   } else {
     res.status(400).json(result);
+  }
+});
+
+// ─── POST /jobs/scrape-naukri — Scrape a Naukri listing page ────────────────
+// Admin-only. Accepts a Naukri search/listing URL, scrapes all pages,
+// stores every job, then re-runs trend analysis.
+
+const ScrapeNaukriBody = z.object({
+  url: z
+    .string()
+    .url("Must be a valid URL")
+    .refine(u => u.includes("naukri.com"), { message: "URL must be from naukri.com" }),
+});
+
+router.post("/jobs/scrape-naukri", requireAdmin, async (req, res): Promise<void> => {
+  const parsed = ScrapeNaukriBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Invalid request" });
+    return;
+  }
+
+  try {
+    const scrape = await scrapeNaukriListingPage(parsed.data.url);
+    const trends = await analyzeTrends();
+
+    res.json({
+      scrape,
+      trends: {
+        top_technologies: trends.top_technologies,
+        top_stack_combinations: trends.top_stack_combinations,
+        total_jobs_analyzed: trends.total_jobs_analyzed,
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: `Naukri scraping failed: ${error.message}` });
   }
 });
 

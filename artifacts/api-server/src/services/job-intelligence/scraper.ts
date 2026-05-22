@@ -11,7 +11,6 @@ import { db, scrapedJobPostingsTable, type InsertScrapedJobPosting } from "../..
 import { sql } from "drizzle-orm";
 import { parseJobUrl, type ScrapedJobData } from "./parser";
 import { logger } from "../../lib/logger";
-import { isNaukriListingUrl, scrapeNaukriListingPage } from "./naukriScraper";
 
 // Robust path resolution for config file
 function resolveConfigPath(): string {
@@ -142,41 +141,24 @@ export async function scrapeAllSources(): Promise<{
     try {
       logger.info({ url }, "Scraping job URL");
 
-      // Route Naukri listing URLs to the multi-page scraper
-      if (isNaukriListingUrl(url)) {
-        const naukriResults = await scrapeNaukriListingPage(url);
-        for (const data of naukriResults) {
-          await storeScrapedJob(data);
-          success++;
-          results.push({
-            url: data.sourceUrl,
-            status: "success",
-            title: data.title,
-            stackCount: data.extractedStack.length,
-          });
-        }
-        logger.info({ url, jobsFound: naukriResults.length }, "Naukri listing scrape complete");
-      } else {
-        // Existing flow for generic, lever, greenhouse
-        const data = await parseJobUrl(url);
+      const data = await parseJobUrl(url);
 
-        if (data) {
-          await storeScrapedJob(data);
-          success++;
-          results.push({
-            url,
-            status: "success",
-            title: data.title,
-            stackCount: data.extractedStack.length,
-          });
-          logger.info(
-            { url, title: data.title, techs: data.extractedStack.length },
-            "Successfully scraped and stored job",
-          );
-        } else {
-          failed++;
-          results.push({ url, status: "failed", error: "Parser returned null" });
-        }
+      if (data) {
+        await storeScrapedJob(data);
+        success++;
+        results.push({
+          url,
+          status: "success",
+          title: data.title,
+          stackCount: data.extractedStack.length,
+        });
+        logger.info(
+          { url, title: data.title, techs: data.extractedStack.length },
+          "Successfully scraped and stored job",
+        );
+      } else {
+        failed++;
+        results.push({ url, status: "failed", error: "Parser returned null" });
       }
     } catch (error: any) {
       failed++;
