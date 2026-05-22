@@ -9,10 +9,10 @@ import { logger } from "./lib/logger";
 import { initializeJobsSync } from "./services/jobsSync";
 
 const FRONTEND_PORT = process.env.FRONTEND_PORT ?? "5173";
-
+ 
 const app: Express = express();
 
-initializeJobsSync();
+// initializeJobsSync();
 
 app.use(
   pinoHttp({
