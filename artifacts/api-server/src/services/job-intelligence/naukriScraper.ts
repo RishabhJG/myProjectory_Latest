@@ -72,13 +72,45 @@ async function extractJobsFromPage(page: Page): Promise<ScrapedJobData[]> {
   const jobs: ScrapedJobData[] = [];
 
   try {
-    await page.waitForSelector(".srp-jobtuple-wrapper", { timeout: 20000 });
-  } catch {
-    logger.warn("No .srp-jobtuple-wrapper cards found within timeout — page may be empty or blocked.");
+    // Try to wait for network to be idle first (more reliable)
+    await Promise.race([
+      page.waitForLoadState("networkidle"),
+      new Promise(resolve => setTimeout(resolve, 15000)),
+    ]).catch(() => {
+      // If network idle times out, continue anyway
+    });
+
+    // Try primary selector
+    let cardsExist = await page.$(".srp-jobtuple-wrapper");
+    
+    // Try fallback selectors if primary doesn't exist
+    if (!cardsExist) {
+      cardsExist = await page.$("[class*='jobTuple']");
+    }
+    if (!cardsExist) {
+      cardsExist = await page.$("[class*='jobCard']");
+    }
+
+    if (!cardsExist) {
+      logger.warn(
+        { pageUrl: page.url() },
+        "No job card selectors found. Naukri may be blocking bot access or page structure changed."
+      );
+      return jobs;
+    }
+
+    await page.waitForSelector(".srp-jobtuple-wrapper, [class*='jobTuple'], [class*='jobCard']", {
+      timeout: 15000,
+    });
+  } catch (err: any) {
+    logger.warn(
+      { error: err.message, pageUrl: page.url() },
+      "No job cards found within timeout — page may be empty, blocked, or structure changed."
+    );
     return jobs;
   }
 
-  const cards = await page.$$(".srp-jobtuple-wrapper");
+  const cards = await page.$$(".srp-jobtuple-wrapper, [class*='jobTuple'], [class*='jobCard']");
   logger.info({ cardCount: cards.length }, "Job cards detected on Naukri page");
 
   for (const card of cards) {
@@ -139,7 +171,7 @@ async function extractJobsFromPage(page: Page): Promise<ScrapedJobData[]> {
         location: location?.slice(0, 200) ?? null,
         experience: experience?.slice(0, 100) ?? null,
         employmentType: null,
-        description: descSnippet.slice(0, 5000),
+        description: descSnippet.slice(0, 4096),
         extractedStack,
         postedDate: null,
         sourceUrl,
@@ -238,14 +270,33 @@ export async function scrapeNaukriListingPage(startUrl: string): Promise<NaukriS
       "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     viewport: { width: 1366, height: 768 },
     locale: "en-IN",
-    extraHTTPHeaders: { "Accept-Language": "en-IN,en;q=0.9" },
+    extraHTTPHeaders: {
+      "Accept-Language": "en-IN,en;q=0.9",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+      "Sec-Fetch-Dest": "document",
+      "Sec-Fetch-Mode": "navigate",
+      "Sec-Fetch-Site": "none",
+    },
   });
 
   await context.addInitScript(() => {
     Object.defineProperty(navigator, "webdriver", { get: () => false });
+    Object.defineProperty(navigator, "plugins", { get: () => [1, 2, 3, 4, 5] });
+    Object.defineProperty(navigator, "languages", { get: () => ["en-IN", "en"] });
   });
 
   const page = await context.newPage();
+  
+  // Add request listener to see if Naukri is blocking us
+  page.on("response", (response) => {
+    if (response.status() === 403 || response.status() === 429) {
+      logger.warn(
+        { status: response.status(), url: response.url() },
+        "Received blocking response from Naukri"
+      );
+    }
+  });
+
   let pageNum = 1;
 
   try {
@@ -255,6 +306,13 @@ export async function scrapeNaukriListingPage(startUrl: string): Promise<NaukriS
 
       try {
         await page.goto(pageUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+        // Wait for network to be more idle after page load
+        await Promise.race([
+          page.waitForLoadState("networkidle"),
+          new Promise(resolve => setTimeout(resolve, 10000)),
+        ]).catch(() => {
+          // Continue even if network idle times out
+        });
       } catch (err: any) {
         logger.error({ error: err.message, url: pageUrl }, "Navigation failed");
         break;

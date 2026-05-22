@@ -75,7 +75,7 @@ export async function parseGreenhouseJob(url: string): Promise<ScrapedJobData | 
       location,
       experience: null, // Greenhouse doesn't expose this in structured form
       employmentType: null,
-      description: descriptionText.slice(0, 5000),
+      description: descriptionText.slice(0, 4096),
       extractedStack,
       postedDate: data.updated_at ? new Date(data.updated_at) : null,
       sourceUrl: url,
@@ -128,7 +128,7 @@ export async function parseLeverJob(url: string): Promise<ScrapedJobData | null>
       descParts.push(data.additionalPlain);
     }
 
-    const description = descParts.join("\n").slice(0, 5000);
+    const description = descParts.join("\n").slice(0, 4096);
     const extractedStack = extractTechStack(description);
 
     // Lever categories for work type, location, team
@@ -222,7 +222,7 @@ export async function parseGenericJob(url: string): Promise<ScrapedJobData | nul
       description = $("body").text().trim();
     }
 
-    description = description.replace(/\s+/g, " ").slice(0, 5000);
+    description = description.replace(/\s+/g, " ").slice(0, 4096);
 
     // Extract location
     const location =

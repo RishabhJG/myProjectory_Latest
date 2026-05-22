@@ -16,14 +16,6 @@ import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { DurationRoller } from "@/components/ui/duration-roller";
-import { 
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
 
 const PREDEFINED_CATEGORIES = [
   "Web App",
@@ -110,7 +102,7 @@ export default function PortfolioDetail() {
   const updateMutation = useUpdateProject();
 
   const [techInput, setTechInput] = useState("");
-  const [showOtherInput, setShowOtherInput] = useState(false);
+  const [showTechDropdown, setShowTechDropdown] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -182,7 +174,10 @@ export default function PortfolioDetail() {
     // Find the canonical form from POPULAR_TECHNOLOGIES (case-insensitive match)
     const canonicalTech = POPULAR_TECHNOLOGIES.find(
       t => t.toLowerCase() === techToAdd.toLowerCase()
-    ) || techToAdd; // Use the provided name if not in popular list
+    );
+
+    // Only allow adding if found in predefined list
+    if (!canonicalTech) return;
 
     // Check if already exists (case-insensitive comparison)
     const alreadyExists = current.some(t => t.toLowerCase() === canonicalTech.toLowerCase());
@@ -190,6 +185,7 @@ export default function PortfolioDetail() {
     if (!alreadyExists) {
       form.setValue("technologies", [...current, canonicalTech], { shouldValidate: true });
       setTechInput("");
+      setShowTechDropdown(false);
     }
   };
 
@@ -284,70 +280,74 @@ export default function PortfolioDetail() {
                 <CardContent className="space-y-4">
                   <div className="space-y-3">
                     <label className="text-sm font-medium leading-none">Technologies Used</label>
-                    <div className="flex gap-2">
-                      <Input 
-                        value={techInput} 
-                        onChange={e => setTechInput(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTech(); } }}
-                        placeholder="Search or type a technology..."
-                        className="glass"
-                      />
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button type="button" variant="secondary" className="gap-1">
-                            <ChevronDown className="w-4 h-4" />
-                            Select
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56 max-h-96 overflow-y-auto">
-                          <DropdownMenuLabel>Popular Technologies</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          {POPULAR_TECHNOLOGIES
-                            .filter(tech => 
-                              !form.watch("technologies").includes(tech) &&
-                              (techInput === "" || tech.toLowerCase().includes(techInput.toLowerCase()))
-                            )
-                            .map(tech => (
-                              <DropdownMenuItem
-                                key={tech}
-                                onClick={() => addTech(tech)}
-                              >
-                                {tech}
-                              </DropdownMenuItem>
-                            ))}
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() => setShowOtherInput(!showOtherInput)}
-                          >
-                            <Plus className="w-4 h-4 mr-2" />
-                            Add other
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                    <div className="flex gap-2 relative">
+                      <div className="relative flex-1">
+                        <Input 
+                          value={techInput} 
+                          onChange={(e) => {
+                            setTechInput(e.target.value);
+                            setShowTechDropdown(true);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const filtered = POPULAR_TECHNOLOGIES.filter(tech => 
+                                !form.watch("technologies").includes(tech) &&
+                                tech.toLowerCase().includes(techInput.toLowerCase())
+                              );
+                              if (filtered.length > 0) {
+                                addTech(filtered[0]);
+                              }
+                            }
+                          }}
+                          onFocus={() => setShowTechDropdown(true)}
+                          placeholder="Search or type a technology..."
+                          className="glass pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowTechDropdown(!showTechDropdown)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          <ChevronDown className="w-4 h-4" />
+                        </button>
+                        
+                        {/* Dropdown List */}
+                        {showTechDropdown && (
+                          <div className="absolute z-50 w-full mt-1 bg-background border border-input rounded-md shadow-lg">
+                            <div className="max-h-60 overflow-y-auto">
+                              {POPULAR_TECHNOLOGIES.filter(tech => 
+                                !form.watch("technologies").includes(tech) &&
+                                (techInput === "" || tech.toLowerCase().includes(techInput.toLowerCase()))
+                              ).length > 0 ? (
+                                POPULAR_TECHNOLOGIES.filter(tech => 
+                                  !form.watch("technologies").includes(tech) &&
+                                  (techInput === "" || tech.toLowerCase().includes(techInput.toLowerCase()))
+                                ).map(tech => (
+                                  <button
+                                    key={tech}
+                                    type="button"
+                                    onClick={() => {
+                                      addTech(tech);
+                                      setTechInput("");
+                                      setShowTechDropdown(false);
+                                    }}
+                                    className="w-full px-3 py-2 text-left hover:bg-accent transition-colors text-sm"
+                                  >
+                                    {tech}
+                                  </button>
+                                ))
+                              ) : (
+                                <div className="px-3 py-2 text-sm text-muted-foreground">
+                                  No matching technologies
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                       <Button type="button" onClick={() => addTech()} variant="secondary">Add</Button>
                     </div>
-                    {showOtherInput && (
-                      <div className="flex gap-2">
-                        <Input 
-                          placeholder="Enter custom technology..."
-                          className="glass"
-                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTech(); } }}
-                          value={techInput}
-                          onChange={e => setTechInput(e.target.value)}
-                          autoFocus
-                        />
-                        <Button 
-                          type="button" 
-                          onClick={() => {
-                            addTech();
-                            setShowOtherInput(false);
-                          }} 
-                          variant="secondary"
-                        >
-                          Add Custom
-                        </Button>
-                      </div>
-                    )}
                     <div className="flex flex-wrap gap-2 mt-3">
                       {form.watch("technologies").map(tech => (
                         <Badge key={tech} variant="secondary" className="pl-3 pr-1 py-1 flex items-center gap-1">
