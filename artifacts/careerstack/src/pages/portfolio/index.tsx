@@ -14,7 +14,7 @@ import {
   useUpdatePortfolio,
   useUpdatePortfolioProjects,
 } from "@/hooks/use-portfolio-api";
-import { ExternalLink, Github, Link as LinkIcon, RefreshCw, Sparkles, Star } from "lucide-react";
+import { ExternalLink, Github, Link as LinkIcon, RefreshCw, Sparkles, Star, Edit2 } from "lucide-react";
 
 function buildTechSummary(technologies: string[]) {
   const counts = new Map<string, number>();
@@ -305,7 +305,10 @@ export default function Portfolio() {
                         />
                       </div>
                     )}
-                    <CardHeader className="space-y-3">
+                    <CardHeader className="space-y-3 relative">
+                      <Link href={`/portfolio/${project.id}`} className="absolute top-6 right-6 inline-flex items-center justify-center rounded-lg p-1.5 hover:bg-accent transition-colors text-muted-foreground hover:text-foreground">
+                        <Edit2 className="w-4 h-4" />
+                      </Link>
                       <div>
                         <CardTitle className="text-lg">{project.title}</CardTitle>
                         <CardDescription className="line-clamp-2">{project.description || "No description provided."}</CardDescription>
@@ -404,7 +407,10 @@ export default function Portfolio() {
                 <LinkIcon className="w-4 h-4 text-primary" />
                 <span className="break-all">{shareLink}</span>
               </div>
-              <Button variant="outline" onClick={copyLink}>Copy Link</Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={copyLink}>Copy Link</Button>
+                <Button variant="outline" onClick={() => window.open(shareLink, "_blank")}>Open Link</Button>
+              </div>
             </div>
           )}
         </CardContent>

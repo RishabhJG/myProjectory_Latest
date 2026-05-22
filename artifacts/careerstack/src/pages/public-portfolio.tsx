@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ExternalLink, Github, Globe, Sparkles, Download, Loader2 } from "lucide-react";
-import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { useToast } from "@/hooks/use-toast";
 import { usePublicPortfolioBySlug, usePublicPortfolioByToken } from "@/hooks/use-portfolio-api";
@@ -42,60 +41,197 @@ export default function PublicPortfolioPage({ mode }: PublicPortfolioPageProps) 
   const { toast } = useToast();
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
+  const topSkills = useMemo(() => {
+    if (!portfolio?.techScores) return [];
+    return portfolio.techScores;
+  }, [portfolio]);
+
   const handleDownloadPdf = async () => {
-    const element = document.getElementById("portfolio-content");
-    if (!element || !portfolio) return;
+    if (!portfolio) return;
 
     try {
       setIsGeneratingPdf(true);
       toast({
         title: "Generating PDF",
-        description: "Capturing your portfolio... This may take a few seconds.",
+        description: "Building your portfolio PDF...",
       });
-      
-      let canvas;
-      try {
-        // Try with CORS enabled first to get high-quality images
-        canvas = await html2canvas(element, {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          backgroundColor: document.documentElement.classList.contains("dark") ? "#020817" : "#ffffff", 
-        });
-      } catch (corsErr) {
-        console.warn("PDF generation with CORS failed, retrying without CORS...", corsErr);
-        // Fallback to disabling CORS to avoid tained canvas / loading crashes
-        canvas = await html2canvas(element, {
-          scale: 2,
-          useCORS: false,
-          logging: false,
-          backgroundColor: document.documentElement.classList.contains("dark") ? "#020817" : "#ffffff", 
+
+      // Use a small timeout to allow the toast to render before the synchronous PDF work
+      await new Promise((r) => setTimeout(r, 100));
+
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 18;
+      const contentWidth = pageWidth - margin * 2;
+      let y = margin;
+
+      // ── Helpers ──
+      const setFont = (size: number, style: "normal" | "bold" | "italic" = "normal") => {
+        pdf.setFontSize(size);
+        pdf.setFont("helvetica", style);
+      };
+
+      const checkPage = (needed: number) => {
+        if (y + needed > pageHeight - margin) {
+          pdf.addPage();
+          y = margin;
+        }
+      };
+
+      const drawWrappedText = (text: string, fontSize: number, style: "normal" | "bold" | "italic" = "normal", maxWidth: number = contentWidth) => {
+        setFont(fontSize, style);
+        const lines: string[] = pdf.splitTextToSize(text, maxWidth);
+        const lineHeight = fontSize * 0.45;
+        for (const line of lines) {
+          checkPage(lineHeight + 2);
+          pdf.text(line, margin, y);
+          y += lineHeight;
+        }
+      };
+
+      const drawHr = () => {
+        checkPage(6);
+        y += 3;
+        pdf.setDrawColor(200, 200, 200);
+        pdf.setLineWidth(0.3);
+        pdf.line(margin, y, pageWidth - margin, y);
+        y += 5;
+      };
+
+      // ── Header: Name & Title ──
+      setFont(24, "bold");
+      pdf.setTextColor(30, 30, 60);
+      pdf.text(portfolio.student.name, margin, y);
+      y += 9;
+
+      if (portfolio.title) {
+        setFont(12, "normal");
+        pdf.setTextColor(100, 100, 120);
+        pdf.text(portfolio.title, margin, y);
+        y += 6;
+      }
+
+      if (portfolio.bio) {
+        y += 2;
+        setFont(10, "normal");
+        pdf.setTextColor(80, 80, 100);
+        const bioLines: string[] = pdf.splitTextToSize(portfolio.bio, contentWidth);
+        for (const line of bioLines) {
+          checkPage(5);
+          pdf.text(line, margin, y);
+          y += 4.5;
+        }
+        y += 2;
+      }
+
+      if (portfolio.student.email) {
+        setFont(9, "normal");
+        pdf.setTextColor(70, 70, 180);
+        pdf.text(portfolio.student.email, margin, y);
+        y += 6;
+      }
+
+      // ── Skills Snapshot ──
+      if (topSkills.length > 0) {
+        drawHr();
+        setFont(14, "bold");
+        pdf.setTextColor(30, 30, 60);
+        pdf.text("Skills Snapshot", margin, y);
+        y += 7;
+
+        setFont(10, "normal");
+        pdf.setTextColor(50, 50, 70);
+        const skillChips = topSkills.map((s) => `${s.technology} (${s.comfortScore})`);
+        const skillText = skillChips.join("  •  ");
+        const skillLines: string[] = pdf.splitTextToSize(skillText, contentWidth);
+        for (const line of skillLines) {
+          checkPage(5);
+          pdf.text(line, margin, y);
+          y += 5;
+        }
+        y += 3;
+      }
+
+      // ── Projects ──
+      if (portfolio.projects.length > 0) {
+        drawHr();
+        setFont(14, "bold");
+        pdf.setTextColor(30, 30, 60);
+        pdf.text(`Projects (${portfolio.projects.length})`, margin, y);
+        y += 8;
+
+        portfolio.projects.forEach((project, idx) => {
+          checkPage(20);
+
+          // Project title
+          setFont(12, "bold");
+          pdf.setTextColor(40, 40, 70);
+          pdf.text(`${idx + 1}. ${project.title}`, margin, y);
+          y += 6;
+
+          // Description
+          if (project.description) {
+            drawWrappedText(project.description, 9, "normal");
+            y += 2;
+          }
+
+          // Technologies
+          if (project.technologies.length > 0) {
+            setFont(9, "bold");
+            pdf.setTextColor(60, 60, 90);
+            checkPage(5);
+            pdf.text("Technologies: ", margin, y);
+            const techLabelWidth = pdf.getTextWidth("Technologies: ");
+            setFont(9, "normal");
+            pdf.setTextColor(80, 80, 110);
+            const techStr = project.technologies.join(", ");
+            const techLines: string[] = pdf.splitTextToSize(techStr, contentWidth - techLabelWidth);
+            pdf.text(techLines[0], margin + techLabelWidth, y);
+            y += 4.5;
+            for (let i = 1; i < techLines.length; i++) {
+              checkPage(5);
+              pdf.text(techLines[i], margin, y);
+              y += 4.5;
+            }
+            y += 1;
+          }
+
+          // Links
+          const links: string[] = [];
+          if (project.githubLink) links.push(`GitHub: ${project.githubLink}`);
+          if (project.liveLink) links.push(`Live: ${project.liveLink}`);
+          if (links.length > 0) {
+            setFont(8, "normal");
+            pdf.setTextColor(70, 70, 180);
+            for (const link of links) {
+              checkPage(5);
+              const linkLines: string[] = pdf.splitTextToSize(link, contentWidth);
+              for (const ll of linkLines) {
+                pdf.text(ll, margin, y);
+                y += 4;
+              }
+            }
+          }
+
+          y += 5;
         });
       }
 
-      const imgData = canvas.toDataURL("image/png");
-      
-      const pdf = new jsPDF("p", "mm", "a4");
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      
-      let heightLeft = pdfHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, "PNG", 0, position, pdfWidth, pdfHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft > 0) {
-        position = heightLeft - pdfHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, pdfWidth, pdfHeight);
-        heightLeft -= pageHeight;
+      // ── Footer on every page ──
+      const totalPages = pdf.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i);
+        setFont(7, "normal");
+        pdf.setTextColor(160, 160, 170);
+        pdf.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 8, { align: "center" });
+        pdf.text("Built with MyProjectory", margin, pageHeight - 8);
+        pdf.text(new Date().toLocaleDateString(), pageWidth - margin, pageHeight - 8, { align: "right" });
       }
 
       const fileName = `${portfolio.student.name.replace(/\s+/g, "_")}_Portfolio.pdf`;
       pdf.save(fileName);
-      
+
       toast({
         title: "Success",
         description: "Your portfolio PDF has been downloaded successfully.",
@@ -137,10 +273,7 @@ export default function PublicPortfolioPage({ mode }: PublicPortfolioPageProps) 
     };
   }, [mode]);
 
-  const topSkills = useMemo(() => {
-    if (!portfolio?.techScores) return [];
-    return portfolio.techScores;
-  }, [portfolio]);
+
 
   if (isLoading) {
     return (

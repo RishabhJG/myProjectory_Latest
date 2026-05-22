@@ -209,35 +209,96 @@ export async function generatePortfolioPDFFromElement(
     return;
   }
 
-  const canvas = await html2canvas(element, {
-    scale: 2,
-    useCORS: true,
-    logging: false,
-  });
+  let clone: HTMLElement | null = null;
 
-  const imgData = canvas.toDataURL("image/png");
-  const doc = new jsPDF({
-    orientation: canvas.width > canvas.height ? "landscape" : "portrait",
-    unit: "mm",
-    format: "a4",
-  });
+  try {
+    // 1. Clone the element and place it off-screen to avoid React re-renders from resetting image sources
+    clone = element.cloneNode(true) as HTMLElement;
+    clone.style.position = "absolute";
+    clone.style.left = "-9999px";
+    clone.style.top = "-9999px";
+    clone.style.width = `${element.clientWidth}px`;
+    clone.style.height = "auto";
+    document.body.appendChild(clone);
 
-  const imgWidth = doc.internal.pageSize.getWidth() - 20;
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
-  const totalPages = Math.ceil(imgHeight / doc.internal.pageSize.getHeight());
+    // 2. Pre-process images in the cloned element to base64
+    const imgElements = Array.from(clone.querySelectorAll("img"));
+    const fallbackTransparentPng = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 
-  let heightLeft = imgHeight;
-  let position = 0;
-
-  for (let page = 0; page < totalPages; page++) {
-    if (page > 0) {
-      doc.addPage();
+    for (const img of imgElements) {
+      if (img.src && !img.src.startsWith("data:") && !img.src.startsWith("blob:")) {
+        try {
+          const cacheBust = `nocache=${Date.now()}`;
+          const srcUrl = img.src.includes("?") ? `${img.src}&${cacheBust}` : `${img.src}?${cacheBust}`;
+          const response = await fetch(srcUrl, { mode: "cors" });
+          if (response.ok) {
+            const blob = await response.blob();
+            const base64 = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            });
+            img.src = base64;
+          } else {
+            console.warn(`Failed to fetch image: status ${response.status}`, img.src);
+            img.src = fallbackTransparentPng;
+          }
+        } catch (e) {
+          console.warn("Failed to convert image to base64:", img.src, e);
+          img.src = fallbackTransparentPng;
+        }
+      }
     }
 
-    doc.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight);
-    heightLeft -= doc.internal.pageSize.getHeight();
-    position -= doc.internal.pageSize.getHeight();
-  }
+    // 3. Wait for all base64 images inside the cloned element to be fully loaded
+    const loadPromises = imgElements.map((img) => {
+      if (!img.complete) {
+        return new Promise((resolve) => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+      }
+      return Promise.resolve();
+    });
+    await Promise.all(loadPromises);
 
-  doc.save(fileName);
+    // 4. Generate the canvas from the cloned element
+    const canvas = await html2canvas(clone, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+    });
+
+    const imgData = canvas.toDataURL("image/png");
+    const doc = new jsPDF({
+      orientation: canvas.width > canvas.height ? "landscape" : "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    const imgWidth = doc.internal.pageSize.getWidth() - 20;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    const totalPages = Math.ceil(imgHeight / doc.internal.pageSize.getHeight());
+
+    let heightLeft = imgHeight;
+    let position = 0;
+
+    for (let page = 0; page < totalPages; page++) {
+      if (page > 0) {
+        doc.addPage();
+      }
+
+      doc.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight);
+      heightLeft -= doc.internal.pageSize.getHeight();
+      position -= doc.internal.pageSize.getHeight();
+    }
+
+    doc.save(fileName);
+  } finally {
+    // 5. Clean up: remove the cloned element from the DOM
+    if (clone && clone.parentNode) {
+      clone.parentNode.removeChild(clone);
+    }
+  }
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
-import { useGetProject, useCreateProject, useUpdateProject, getGetProjectQueryKey, getListProjectsQueryKey } from "@workspace/api-client-react";
+import { useGetProject, useCreateProject, useUpdateProject, useDeleteProject, getGetProjectQueryKey, getListProjectsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,10 +11,20 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, Loader2, Plus, X, ChevronDown, Calendar } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Plus, X, ChevronDown, Calendar, Trash2 } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const PREDEFINED_CATEGORIES = [
   "Web App",
@@ -99,9 +109,11 @@ export default function PortfolioDetail() {
 
   const createMutation = useCreateProject();
   const updateMutation = useUpdateProject();
+  const deleteMutation = useDeleteProject();
 
   const [techInput, setTechInput] = useState("");
   const [showTechDropdown, setShowTechDropdown] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -161,6 +173,18 @@ export default function PortfolioDetail() {
     } catch (error) {
       console.error("Project save error:", error);
       toast({ title: "Error", description: "Failed to save project.", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    try {
+      await deleteMutation.mutateAsync({ id: projectId });
+      queryClient.invalidateQueries({ queryKey: getListProjectsQueryKey() });
+      toast({ title: "Success", description: "Project deleted successfully. Your readiness score has been updated." });
+      setLocation("/portfolio");
+    } catch (error) {
+      console.error("Project delete error:", error);
+      toast({ title: "Error", description: "Failed to delete project.", variant: "destructive" });
     }
   };
 
@@ -646,18 +670,65 @@ export default function PortfolioDetail() {
               </Card>
 
               <div className="flex gap-4 pt-4">
-                <Button type="submit" className="flex-1 rounded-xl" disabled={isPending}>
+                <Button type="submit" className="flex-1 rounded-xl" disabled={isPending || deleteMutation.isPending}>
                   {isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                   {isNew ? "Create Project" : "Save Changes"}
                 </Button>
-                <Button type="button" variant="outline" className="flex-1 rounded-xl glass" onClick={() => setLocation("/portfolio")} disabled={isPending}>
+                <Button type="button" variant="outline" className="flex-1 rounded-xl glass" onClick={() => setLocation("/portfolio")} disabled={isPending || deleteMutation.isPending}>
                   Cancel
                 </Button>
+                {!isNew && (
+                  <Button 
+                    type="button" 
+                    variant="destructive" 
+                    className="rounded-xl" 
+                    onClick={() => setShowDeleteConfirm(true)}
+                    disabled={isPending || deleteMutation.isPending}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete
+                  </Button>
+                )}
               </div>
             </div>
           </div>
         </form>
       </Form>
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Project?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 mt-4">
+              <p>
+                Are you sure you want to delete <strong>{project?.title}</strong>? This action cannot be undone.
+              </p>
+              <div className="bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+                <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                  <strong>⚠️ Note:</strong> Deleting this project will remove all associated technologies from your tech scores and may affect your job readiness score.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteProject}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Confirm Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
