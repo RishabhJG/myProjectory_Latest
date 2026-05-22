@@ -174,6 +174,8 @@ type PortfolioRow = {
   projectDuration: string | null;
   projectRole: string | null;
   projectCategory: string | null;
+  projectStartDate: string | null;
+  projectEndDate: string | null;
   projectCreatedAt: Date | null;
   projectUpdatedAt: Date | null;
   displayOrder: number | null;
@@ -195,6 +197,8 @@ function buildPortfolioResponse(rows: PortfolioRow[]) {
       githubLink: row.projectGithub,
       liveLink: row.projectLive,
       screenshotUrl: row.projectScreenshot,
+      startDate: row.projectStartDate,
+      endDate: row.projectEndDate,
       duration: row.projectDuration,
       role: row.projectRole,
       category: row.projectCategory,
@@ -264,6 +268,8 @@ async function getPortfolioRows(whereClause: any) {
       projectDuration: projectsTable.duration,
       projectRole: projectsTable.role,
       projectCategory: projectsTable.category,
+      projectStartDate: projectsTable.startDate,
+      projectEndDate: projectsTable.endDate,
       projectCreatedAt: projectsTable.createdAt,
       projectUpdatedAt: projectsTable.updatedAt,
       displayOrder: portfolioProjectsTable.displayOrder,

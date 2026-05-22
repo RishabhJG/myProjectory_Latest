@@ -223,3 +223,28 @@
   background: rgba(20, 20, 22, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
+
+/* Custom Calendar Picker Styling */
+input[type="month"] {
+  position: relative;
+}
+
+/* Make transparent webkit calendar indicator cover the custom icon region for seamless trigger */
+input[type="month"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 36px;
+  height: 100%;
+  opacity: 0;
+  z-index: 10;
+}
+
+/* Hide default clear & spin buttons in calendar inputs for clean design */
+input[type="month"]::-webkit-inner-spin-button,
+input[type="month"]::-webkit-clear-button {
+  display: none;
+}
+

@@ -11,11 +11,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, Loader2, Plus, X, ChevronDown } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Plus, X, ChevronDown, Calendar } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
-import { DurationRoller } from "@/components/ui/duration-roller";
 
 const PREDEFINED_CATEGORIES = [
   "Web App",
@@ -412,6 +411,151 @@ export default function PortfolioDetail() {
                   </div>
                 </CardContent>
               </Card>
+
+              <Card className="glass rounded-2xl border-border/50">
+                <CardHeader>
+                  <CardTitle>Timeline & Details</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="startDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Start Month</FormLabel>
+                          <FormControl>
+                            <div className="relative flex items-center">
+                              <Input 
+                                type="month" 
+                                {...field} 
+                                className="glass pr-10" 
+                                onChange={(e) => {
+                                  field.onChange(e);
+                                  const endDate = form.getValues("endDate");
+                                  if (endDate) {
+                                    const duration = calculateDuration(e.target.value, endDate);
+                                    form.setValue("duration", duration);
+                                  }
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                                  if (input && typeof input.showPicker === 'function') {
+                                    try {
+                                      input.showPicker();
+                                    } catch (err) {
+                                      console.error("Failed to show picker:", err);
+                                    }
+                                  }
+                                }}
+                                className="absolute right-3 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                              >
+                                <Calendar className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    {form.watch("completionStatus") === "completed" && (
+                      <FormField
+                        control={form.control}
+                        name="endDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>End Month</FormLabel>
+                            <FormControl>
+                              <div className="relative flex items-center">
+                                <Input 
+                                  type="month" 
+                                  {...field} 
+                                  className="glass pr-10"
+                                  onChange={(e) => {
+                                    field.onChange(e);
+                                    const startDate = form.getValues("startDate");
+                                    if (startDate) {
+                                      const duration = calculateDuration(startDate, e.target.value);
+                                      form.setValue("duration", duration);
+                                    }
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                                    if (input && typeof input.showPicker === 'function') {
+                                      try {
+                                        input.showPicker();
+                                      } catch (err) {
+                                        console.error("Failed to show picker:", err);
+                                      }
+                                    }
+                                  }}
+                                  className="absolute right-3 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                                >
+                                  <Calendar className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+                  </div>
+
+                  {form.watch("completionStatus") === "completed" && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-muted-foreground">Duration:</span>
+                      <span className="font-medium text-foreground">
+                        {calculateDuration(form.watch("startDate"), form.watch("endDate")) || "—"}
+                      </span>
+                    </div>
+                  )}
+
+                  <FormField
+                    control={form.control}
+                    name="role"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Your Role</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g. Full Stack Developer" {...field} className="glass" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="category"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Category</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <FormControl>
+                            <SelectTrigger className="glass">
+                              <SelectValue placeholder="Select a category" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {PREDEFINED_CATEGORIES.map(cat => (
+                              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+              </Card>
             </div>
 
             <div className="space-y-6">
@@ -453,131 +597,47 @@ export default function PortfolioDetail() {
                     name="screenshotUrl"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Screenshot URL</FormLabel>
+                        <FormLabel>Screenshot Image</FormLabel>
+                        <FormDescription>Upload an image or provide a URL</FormDescription>
                         <FormControl>
-                          <Input placeholder="https://..." {...field} className="glass" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </CardContent>
-              </Card>
-
-              <Card className="glass rounded-2xl border-border/50">
-                <CardHeader>
-                  <CardTitle>Timeline & Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="startDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Start Date</FormLabel>
-                          <FormControl>
+                          <div className="space-y-3">
                             <Input 
-                              type="month" 
-                              {...field} 
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => {
+                                    field.onChange(reader.result as string);
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                              className="glass cursor-pointer"
+                            />
+                            <div className="text-xs text-muted-foreground">Or paste URL:</div>
+                            <Input 
+                              placeholder="https://..." 
+                              value={field.value} 
+                              onChange={field.onChange}
                               className="glass" 
-                              onChange={(e) => {
-                                field.onChange(e);
-                                const endDate = form.getValues("endDate");
-                                if (endDate) {
-                                  const duration = calculateDuration(e.target.value, endDate);
-                                  form.setValue("duration", duration);
-                                }
-                              }}
                             />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="endDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>End Date</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="month" 
-                              {...field} 
-                              className="glass"
-                              onChange={(e) => {
-                                field.onChange(e);
-                                const startDate = form.getValues("startDate");
-                                if (startDate) {
-                                  const duration = calculateDuration(startDate, e.target.value);
-                                  form.setValue("duration", duration);
-                                }
-                              }}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <FormField
-                    control={form.control}
-                    name="duration"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Duration</FormLabel>
-                        <FormDescription>Automatically calculated from dates or set manually</FormDescription>
-                        <FormControl>
-                          <div className="flex justify-center">
-                            <DurationRoller
-                              value={parseInt(field.value || "0") || 0}
-                              onChange={(value) => field.onChange(value.toString())}
-                              min={0}
-                              max={120}
-                              step={1}
-                            />
+                            {field.value && (
+                              <div className="mt-2">
+                                <img 
+                                  src={field.value} 
+                                  alt="Screenshot preview" 
+                                  className="w-full h-32 object-cover rounded-lg border border-border/50"
+                                  onError={() => {
+                                    // If image fails to load, clear it
+                                    console.error("Failed to load image");
+                                  }}
+                                />
+                              </div>
+                            )}
                           </div>
                         </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="role"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Your Role</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g. Full Stack Developer" {...field} className="glass" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="category"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Category</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value || ""}>
-                          <FormControl>
-                            <SelectTrigger className="glass">
-                              <SelectValue placeholder="Select a category" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {PREDEFINED_CATEGORIES.map(cat => (
-                              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}

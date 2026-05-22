@@ -53,6 +53,8 @@ export interface PortfolioProjectItem {
   githubLink?: string | null;
   liveLink?: string | null;
   screenshotUrl?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
   duration?: string | null;
   role?: string | null;
   category?: string | null;

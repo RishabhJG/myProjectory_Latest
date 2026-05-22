@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ExternalLink, Github, Globe, Sparkles, Download, Loader2 } from "lucide-react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { useToast } from "@/hooks/use-toast";
 import { usePublicPortfolioBySlug, usePublicPortfolioByToken } from "@/hooks/use-portfolio-api";
 
 interface PublicPortfolioPageProps {
@@ -38,6 +39,7 @@ export default function PublicPortfolioPage({ mode }: PublicPortfolioPageProps) 
   const isLoading = mode === "slug" ? slugQuery.isLoading : tokenQuery.isLoading;
   const error = mode === "slug" ? slugQuery.error : tokenQuery.error;
 
+  const { toast } = useToast();
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   const handleDownloadPdf = async () => {
@@ -46,12 +48,30 @@ export default function PublicPortfolioPage({ mode }: PublicPortfolioPageProps) 
 
     try {
       setIsGeneratingPdf(true);
-      
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: document.documentElement.classList.contains("dark") ? "#020817" : "#ffffff", 
+      toast({
+        title: "Generating PDF",
+        description: "Capturing your portfolio... This may take a few seconds.",
       });
+      
+      let canvas;
+      try {
+        // Try with CORS enabled first to get high-quality images
+        canvas = await html2canvas(element, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: document.documentElement.classList.contains("dark") ? "#020817" : "#ffffff", 
+        });
+      } catch (corsErr) {
+        console.warn("PDF generation with CORS failed, retrying without CORS...", corsErr);
+        // Fallback to disabling CORS to avoid tained canvas / loading crashes
+        canvas = await html2canvas(element, {
+          scale: 2,
+          useCORS: false,
+          logging: false,
+          backgroundColor: document.documentElement.classList.contains("dark") ? "#020817" : "#ffffff", 
+        });
+      }
 
       const imgData = canvas.toDataURL("image/png");
       
@@ -75,8 +95,18 @@ export default function PublicPortfolioPage({ mode }: PublicPortfolioPageProps) 
 
       const fileName = `${portfolio.student.name.replace(/\s+/g, "_")}_Portfolio.pdf`;
       pdf.save(fileName);
+      
+      toast({
+        title: "Success",
+        description: "Your portfolio PDF has been downloaded successfully.",
+      });
     } catch (err) {
       console.error("Failed to generate PDF", err);
+      toast({
+        title: "Export Failed",
+        description: "Could not export PDF. You can also print the page directly using Ctrl + P.",
+        variant: "destructive",
+      });
     } finally {
       setIsGeneratingPdf(false);
     }

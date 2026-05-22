@@ -1,4 +1,4 @@
-import { mysqlTable, varchar, int, timestamp, json, date } from "drizzle-orm/mysql-core";
+import { mysqlTable, varchar, int, timestamp, json, date, longtext } from "drizzle-orm/mysql-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { usersTable } from "./users";
@@ -14,7 +14,7 @@ export const projectsTable = mysqlTable("projects", {
   difficultyLevel: varchar("difficulty_level", { length: 100 }).notNull().default("beginner"),
   githubLink: varchar("github_link", { length: 2048 }),
   liveLink: varchar("live_link", { length: 2048 }),
-  screenshotUrl: varchar("screenshot_url", { length: 2048 }),
+  screenshotUrl: longtext("screenshot_url"),
   startDate: date("start_date"),
   endDate: date("end_date"),
   duration: varchar("duration", { length: 255 }),

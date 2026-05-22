@@ -14,7 +14,7 @@ import {
   useUpdatePortfolio,
   useUpdatePortfolioProjects,
 } from "@/hooks/use-portfolio-api";
-import { ArrowDown, ArrowUp, ExternalLink, Github, Link as LinkIcon, RefreshCw, Sparkles, Star } from "lucide-react";
+import { ExternalLink, Github, Link as LinkIcon, RefreshCw, Sparkles, Star } from "lucide-react";
 
 function buildTechSummary(technologies: string[]) {
   const counts = new Map<string, number>();
@@ -22,6 +22,34 @@ function buildTechSummary(technologies: string[]) {
     counts.set(tech, (counts.get(tech) || 0) + 1);
   }
   return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).map(([tech]) => tech);
+}
+
+function formatDateRange(project: any) {
+  if (!project.startDate) return "";
+  
+  const startDate = new Date(project.startDate);
+  const startStr = startDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  
+  if (project.completionStatus === "completed" && project.endDate) {
+    const endDate = new Date(project.endDate);
+    const endStr = endDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    return `${startStr} - ${endStr}`;
+  }
+  
+  return `${startStr} - Present`;
+}
+
+function calculateDuration(startDate: string, endDate: string): string {
+  if (!startDate || !endDate) return "";
+  
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  const months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+  
+  if (months < 1) return "< 1 month";
+  if (months === 1) return "1 month";
+  return `${months} months`;
 }
 
 export default function Portfolio() {
@@ -106,15 +134,6 @@ export default function Portfolio() {
     }
   };
 
-  const moveProject = (index: number, direction: -1 | 1) => {
-    const nextIndex = index + direction;
-    if (nextIndex < 0 || nextIndex >= projects.length) return;
-    const next = [...projects];
-    const [moved] = next.splice(index, 1);
-    next.splice(nextIndex, 0, moved);
-    persistProjectUpdates(next);
-  };
-
   const toggleFeatured = (index: number) => {
     const next = projects.map((project, idx) => idx === index ? { ...project, isFeatured: !project.isFeatured } : project);
     persistProjectUpdates(next);
@@ -123,8 +142,8 @@ export default function Portfolio() {
   // Sort projects by date (newest first)
   const sortedProjects = useMemo(() => {
     return [...projects].sort((a, b) => {
-      const aDate = new Date(a.endDate || a.createdAt || 0);
-      const bDate = new Date(b.endDate || b.createdAt || 0);
+      const aDate = a.startDate ? new Date(a.startDate) : new Date(a.createdAt || 0);
+      const bDate = b.startDate ? new Date(b.startDate) : new Date(b.createdAt || 0);
       return bDate.getTime() - aDate.getTime();
     });
   }, [projects]);
@@ -276,22 +295,29 @@ export default function Portfolio() {
               {sortedProjects.map((project, index) => {
                 const originalIndex = projects.findIndex(p => p.id === project.id);
                 return (
-                  <Card key={project.id} className="border-border/50">
-                    <CardHeader className="space-y-3">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <CardTitle className="text-lg">{project.title}</CardTitle>
-                          <CardDescription className="line-clamp-2">{project.description || "No description provided."}</CardDescription>
-                        </div>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => moveProject(originalIndex, -1)}>
-                            <ArrowUp className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => moveProject(originalIndex, 1)}>
-                            <ArrowDown className="w-4 h-4" />
-                          </Button>
-                        </div>
+                  <Card key={project.id} className="border-border/50 overflow-hidden flex flex-col">
+                    {project.screenshotUrl && (
+                      <div className="w-full h-40 bg-muted overflow-hidden">
+                        <img 
+                          src={project.screenshotUrl} 
+                          alt={project.title}
+                          className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                        />
                       </div>
+                    )}
+                    <CardHeader className="space-y-3">
+                      <div>
+                        <CardTitle className="text-lg">{project.title}</CardTitle>
+                        <CardDescription className="line-clamp-2">{project.description || "No description provided."}</CardDescription>
+                      </div>
+                      {project.startDate && (
+                        <div className="text-sm text-muted-foreground pt-2 space-y-1">
+                          <div>{formatDateRange(project)}</div>
+                          {project.completionStatus === "completed" && project.endDate && (
+                            <div>Duration: {calculateDuration(project.startDate, project.endDate)}</div>
+                          )}
+                        </div>
+                      )}
                       <div className="flex items-center gap-2 flex-wrap">
                         <Badge className={getStatusColor(project.completionStatus)}>
                           {formatStatus(project.completionStatus)}
@@ -305,7 +331,7 @@ export default function Portfolio() {
                         </Button>
                       </div>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-4 flex-1">
                       <div className="flex flex-wrap gap-2">
                         {project.technologies.map((tech) => (
                           <Badge key={tech} variant="outline">{tech}</Badge>
